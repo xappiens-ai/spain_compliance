@@ -87,7 +87,7 @@ Pre-commit (ruff, prettier, eslint): `pre-commit install`.
 
 ## Maintenance and publishing
 
-The app is developed by [Xappiens](https://xappiens.com) against a production ERPNext and versioned in Xappiens' internal GitLab; this GitHub repository is the public distribution channel and receives the same history on every release. Details in [docs/publicacion.md](docs/publicacion.md).
+The app is developed by [Xappiens](https://xappiens.com) against a production ERPNext and versioned in Xappiens' internal GitLab; this GitHub repository is the public distribution channel and receives the same code on every release. Details in [docs/publicacion.md](docs/publicacion.md).
 
 ## Contributing
 

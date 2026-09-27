@@ -167,7 +167,7 @@ yarn build  # producción → public/frontend + www/contabilidad.html
 
 ## Git
 
-- Rama pública: `version-15` (GitHub). El repositorio canónico es el GitLab interno de Xappiens; GitHub recibe la misma historia en cada publicación. Detalle: [publicacion.md](publicacion.md).
+- Rama pública: `version-15` (GitHub). El repositorio canónico es el GitLab interno de Xappiens; GitHub recibe el mismo código en cada publicación. Detalle: [publicacion.md](publicacion.md).
 - La app se prueba en un ERPNext **en producción**: patches idempotentes y nada de escrituras masivas sin confirmación.
 - No mezclar cambios de Frappe 16 en esta rama.
 - Sin secretos, sin dumps, sin configuración de sitios concretos en el repo.

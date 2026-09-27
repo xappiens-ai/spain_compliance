@@ -5,9 +5,9 @@
 | Repositorio | Papel |
 |---|---|
 | GitLab interno de Xappiens | **Canónico.** Aquí se hace el desarrollo diario y aquí está la rama que corre en el ERP de Xappiens. |
-| [GitHub `xappiens-ai/spain_compliance`](https://github.com/xappiens-ai/spain_compliance) | **Público.** Es de donde instalan Frappe Cloud y `bench get-app`. Recibe la misma historia que GitLab. |
+| [GitHub `xappiens-ai/spain_compliance`](https://github.com/xappiens-ai/spain_compliance) | **Público.** Es de donde instalan Frappe Cloud y `bench get-app`. |
 
-Ambos contienen los mismos commits. GitHub no es un fork ni una copia editada: se actualiza con cada push a GitLab que sea publicable. Si encuentras diferencias entre los dos, GitLab es el que vale.
+GitHub recibe un commit por publicación con el mismo contenido que la rama de producción de GitLab. El historial de trabajo interno no se publica. Si encuentras diferencias de contenido entre los dos, GitLab es el que vale.
 
 ## Ramas
 
@@ -38,4 +38,4 @@ La app se desarrolla y se prueba en un ERPNext **en producción** (el de Xappien
 
 ## Contribuciones externas
 
-Se aceptan issues y pull requests en GitHub. Los PR aceptados se integran primero en GitLab y vuelven a GitHub en el siguiente push, para que ambos sigan con la misma historia.
+Se aceptan issues y pull requests en GitHub. Los PR aceptados se integran primero en GitLab y llegan a GitHub en la siguiente publicación.
