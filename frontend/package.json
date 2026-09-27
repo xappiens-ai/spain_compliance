@@ -1,0 +1,26 @@
+{
+  "name": "spain-compliance-ui",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --base=/assets/spain_compliance/frontend/ && yarn copy-html-entry",
+    "copy-html-entry": "cp ../spain_compliance/public/frontend/index.html ../spain_compliance/www/contabilidad.html",
+    "serve": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
+    "frappe-ui": "1.0.0-beta.29",
+    "pinia": "^2.0.33",
+    "socket.io-client": "^4.7.2",
+    "vite": "^5.4.21",
+    "vue": "^3.5.13",
+    "vue-router": "^4.2.2"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.5",
+    "tailwindcss": "^3.4.15"
+  }
+}
