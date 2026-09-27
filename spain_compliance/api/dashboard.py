@@ -7,15 +7,22 @@ from datetime import date, timedelta
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Coalesce, Count, Date, Sum
 from frappe.utils import add_months, get_first_day, getdate, today
 
 from spain_compliance.api.permission import has_app_permission
 
-PERIODS = {
-	"this_month": _("Este mes"),
-	"this_quarter": _("Este trimestre"),
-	"this_year": _("Este año"),
-}
+_ALLOWED_TOTAL_DOCTYPES = frozenset({"Sales Invoice", "Purchase Invoice"})
+_ALLOWED_AGGREGATE_DOCTYPES = frozenset({"Sales Invoice", "Purchase Invoice", "Payment Entry"})
+_ALLOWED_AMOUNT_FIELDS = frozenset({"grand_total", "paid_amount", "outstanding_amount"})
+
+
+def _periods() -> dict[str, str]:
+	return {
+		"this_month": _("Este mes"),
+		"this_quarter": _("Este trimestre"),
+		"this_year": _("Este año"),
+	}
 
 
 def _period_start(period: str) -> date:
@@ -51,44 +58,36 @@ def _empty_invoice_totals() -> dict:
 
 
 def _invoice_totals(doctype: str, company: str | None, start: date, end: date) -> dict:
-	conditions = ["docstatus = 1", "posting_date between %(start)s and %(end)s"]
-	params: dict = {"start": start, "end": end}
+	if doctype not in _ALLOWED_TOTAL_DOCTYPES:
+		frappe.throw(_("Invalid doctype"))
+
+	Doc = frappe.qb.DocType(doctype)
+	query = (
+		frappe.qb.from_(Doc)
+		.select(
+			Coalesce(Sum(Doc.grand_total), 0).as_("billed"),
+			Coalesce(Sum(Doc.outstanding_amount), 0).as_("outstanding_in_period"),
+			Count("*").as_("count"),
+		)
+		.where(Doc.docstatus == 1)
+		.where(Doc.posting_date.between(start, end))
+	)
 	if company:
-		conditions.append("company = %(company)s")
-		params["company"] = company
+		query = query.where(Doc.company == company)
+	row = query.run(as_dict=True)[0]
 
-	where = " and ".join(conditions)
-	row = frappe.db.sql(
-		f"""
-		select
-			coalesce(sum(grand_total), 0) as billed,
-			coalesce(sum(outstanding_amount), 0) as outstanding_in_period,
-			count(*) as count
-		from `tab{doctype}`
-		where {where}
-		""",
-		params,
-		as_dict=True,
-	)[0]
-
-	open_conditions = ["docstatus = 1", "outstanding_amount > 0"]
-	open_params: dict = {}
+	open_query = (
+		frappe.qb.from_(Doc)
+		.select(
+			Coalesce(Sum(Doc.outstanding_amount), 0).as_("outstanding"),
+			Count("*").as_("count"),
+		)
+		.where(Doc.docstatus == 1)
+		.where(Doc.outstanding_amount > 0)
+	)
 	if company:
-		open_conditions.append("company = %(company)s")
-		open_params["company"] = company
-
-	open_where = " and ".join(open_conditions)
-	open_row = frappe.db.sql(
-		f"""
-		select
-			coalesce(sum(outstanding_amount), 0) as outstanding,
-			count(*) as count
-		from `tab{doctype}`
-		where {open_where}
-		""",
-		open_params,
-		as_dict=True,
-	)[0]
+		open_query = open_query.where(Doc.company == company)
+	open_row = open_query.run(as_dict=True)[0]
 
 	billed = float(row.billed or 0)
 	outstanding_open = float(open_row.outstanding or 0)
@@ -163,45 +162,41 @@ def _aggregate_doctype(
 	start: date,
 	end: date,
 	grain: str,
-	extra_conditions: str = "",
-	extra_params: dict | None = None,
+	extra_filters: dict | None = None,
 ) -> dict[str, float]:
+	if doctype not in _ALLOWED_AGGREGATE_DOCTYPES or amount_field not in _ALLOWED_AMOUNT_FIELDS:
+		frappe.throw(_("Invalid aggregate query"))
+
+	Doc = frappe.qb.DocType(doctype)
+	amount_col = Doc[amount_field]
 	if grain == "day":
-		select_key = "date(posting_date)"
+		bucket_expr = Date(Doc.posting_date)
 		key_fmt = "%Y-%m-%d"
 	else:
-		select_key = "date_format(posting_date, '%%Y-%%m-01')"
-		key_fmt = "%Y-%m-%d"
+		# First day of month; MySQL DATE_FORMAT via raw Criterion is avoided —
+		# truncate in Python after fetching day buckets grouped by month key.
+		bucket_expr = Date(Doc.posting_date)
+		key_fmt = "%Y-%m-01"
 
-	conditions = [
-		"docstatus = 1",
-		"posting_date between %(start)s and %(end)s",
-	]
-	params: dict = {"start": start, "end": end}
-	if company:
-		conditions.append("company = %(company)s")
-		params["company"] = company
-	if extra_conditions:
-		conditions.append(extra_conditions)
-	if extra_params:
-		params.update(extra_params)
-
-	where = " and ".join(conditions)
-	rows = frappe.db.sql(
-		f"""
-		select {select_key} as bucket, coalesce(sum({amount_field}), 0) as amount
-		from `tab{doctype}`
-		where {where}
-		group by bucket
-		order by bucket
-		""",
-		params,
-		as_dict=True,
+	query = (
+		frappe.qb.from_(Doc)
+		.select(bucket_expr.as_("bucket"), Coalesce(Sum(amount_col), 0).as_("amount"))
+		.where(Doc.docstatus == 1)
+		.where(Doc.posting_date.between(start, end))
+		.groupby(bucket_expr)
+		.orderby(bucket_expr)
 	)
+	if company:
+		query = query.where(Doc.company == company)
+	if extra_filters:
+		for field, value in extra_filters.items():
+			query = query.where(Doc[field] == value)
+
+	rows = query.run(as_dict=True)
 	out: dict[str, float] = {}
 	for row in rows:
 		key = getdate(row.bucket).strftime(key_fmt)
-		out[key] = float(row.amount or 0)
+		out[key] = out.get(key, 0.0) + float(row.amount or 0)
 	return out
 
 
@@ -225,7 +220,7 @@ def _cashflow_series(company: str | None, start: date, end: date, period: str) -
 			start,
 			end,
 			grain,
-			extra_conditions="payment_type = 'Receive'",
+			extra_filters={"payment_type": "Receive"},
 		)
 		outflow_map = _aggregate_doctype(
 			"Payment Entry",
@@ -234,7 +229,7 @@ def _cashflow_series(company: str | None, start: date, end: date, period: str) -
 			start,
 			end,
 			grain,
-			extra_conditions="payment_type = 'Pay'",
+			extra_filters={"payment_type": "Pay"},
 		)
 
 	if can_si and (not inflow_map or sum(inflow_map.values()) == 0):
@@ -296,7 +291,8 @@ def get_tablero(period: str = "this_year") -> dict:
 	if frappe.session.user == "Guest" or not has_app_permission():
 		frappe.throw(_("No permission"), frappe.PermissionError)
 
-	if period not in PERIODS:
+	periods = _periods()
+	if period not in periods:
 		period = "this_year"
 
 	start = _period_start(period)
@@ -322,7 +318,7 @@ def get_tablero(period: str = "this_year") -> dict:
 
 	return {
 		"period": period,
-		"period_label": PERIODS[period],
+		"period_label": periods[period],
 		"from_date": str(start),
 		"to_date": str(end),
 		"company": company,

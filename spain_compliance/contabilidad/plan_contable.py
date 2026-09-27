@@ -384,7 +384,6 @@ def reestructurar_arbol(
 		except (frappe.LinkExistsError, frappe.ValidationError):
 			resumen["no_borrados"].append(raiz)
 
-	frappe.db.commit()
 	return resumen
 
 

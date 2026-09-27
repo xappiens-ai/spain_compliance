@@ -54,9 +54,8 @@ def auto_mark_dudoso_cobro() -> dict:
 			marked.append(name)
 
 	if marked:
-		frappe.db.commit()
 		frappe.logger("spain_compliance").info(
-			f"auto_mark_dudoso_cobro: {len(marked)} invoices → Dudoso Cobro"
+			"auto_mark_dudoso_cobro: %s invoices → Dudoso Cobro", len(marked)
 		)
 
 	return {"marked": len(marked), "names": marked}
