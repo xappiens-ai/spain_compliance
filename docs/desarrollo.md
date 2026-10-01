@@ -27,6 +27,7 @@ La app se publica en el Marketplace de Frappe Cloud. Por tanto:
 - Todo lo que dependa de la empresa vive en **campos de `Company`** definidos en `spain_compliance/setup/custom_fields.py` (sección *Contabilidad España*).
 - Los Custom Fields **no llevan prefijo `custom_`** (ese prefijo es de Customize Form). Se crean en `after_install` / `after_migrate` y se eliminan en `before_uninstall`.
 - Las funciones que cambian datos en masa (p. ej. conversión al PGC) deben ser **idempotentes**, pedir confirmación en la UI y ejecutarse en segundo plano.
+- Lo que cambie cómo se contabiliza en compañías existentes va **desactivado por defecto** (opt-in en Company).
 - Las cadenas de usuario van con `_()` / `__()`.
 
 ## Arquitectura
@@ -43,7 +44,8 @@ Apps screen  →  /contabilidad
 ERPNext Desk
   Sales Invoice  ← override (serie rectificativa, Dudoso Cobro / Pérdida) + public/js/sales_invoice.js
   Account        ← override (root_type propio en compañías PGC)
-  Company        ← Custom Fields + public/js/company.js (botón conversión PGC)
+  Company        ← Custom Fields + public/js/company.js (conversión PGC, cuentas de tercero pendientes)
+  Customer / Supplier / facturas ← doc_events: subcuenta 430/400 por tercero (cuentas_tercero.py)
   Informes financieros ← monkey_patches.py (Balance / PyG con árbol PGC)
 ```
 
@@ -65,6 +67,7 @@ ERPNext Desk
 | `overrides/sales_invoice.py` | Serie rectificativa por Company; estados Dudoso Cobro / Pérdida; API `set_cobro_status` |
 | `overrides/account.py` | `root_type` propio por cuenta en compañías PGC |
 | `contabilidad/plan_contable.py` | Grupos/subgrupos PGC, `reestructurar_arbol`, API `convertir_plan_a_pgc` |
+| `contabilidad/cuentas_tercero.py` | Subcuenta por cliente/proveedor con secuencia PGC; backfill `crear_cuentas_pendientes` ([cuentas-tercero.md](cuentas-tercero.md)) |
 | `monkey_patches.py` | Parches de `erpnext.accounts.report.financial_statements` para el árbol PGC |
 | `tasks.py` | Tarea diaria `auto_mark_dudoso_cobro` (por Company, `meses_dudoso_cobro`) |
 | `www/contabilidad.py` | Contexto SPA: Guest → login, `has_app_permission`, `get_boot` |
@@ -72,6 +75,7 @@ ERPNext Desk
 | `api/dashboard.py` | Métricas del tablero |
 | `public/js/*.js` | Form scripts de Desk (Sales Invoice, Company) |
 | `patches/` | Migraciones de datos (`patches.txt`) |
+| `tests/` | Tests de integración (`FrappeTestCase`) |
 
 ### Frontend
 
@@ -149,6 +153,21 @@ Un único **`ListViewBuilder`** sobre las primitivas `ListView`, `ListHeader`, `
 bench --site <sitio> migrate
 bench --site <sitio> clear-cache
 bench restart
+```
+
+## Tests
+
+Tests de integración en `spain_compliance/tests/`, con `FrappeTestCase` (cada test se deshace al terminar). Crean sus propias compañías `_Test SC …` con árbol PGC, así que no dependen de datos del sitio.
+
+- **Nunca en un sitio con datos reales**: usar un sitio desechable con ERPNext y la app, y `allow_tests`.
+- Toda funcionalidad nueva con efectos en BD lleva sus tests: casos normales, configuración inválida, idempotencia y compañías sin PGC (no debe hacer nada).
+- Los fixtures que necesitan grupos de cliente / proveedor / artículo crean los suyos (no hay datos de demo en un sitio limpio).
+
+```bash
+bench new-site <test-site> --install-app erpnext --install-app spain_compliance
+bench --site <test-site> set-config allow_tests true
+bench --site <test-site> run-tests --app spain_compliance
+bench --site <test-site> run-tests --module spain_compliance.tests.test_cuentas_tercero
 ```
 
 ## Build, assets y Git

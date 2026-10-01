@@ -32,5 +32,40 @@ frappe.ui.form.on("Company", {
 			},
 			__("Contabilidad España")
 		);
+
+		const backfill = [
+			["crear_cuenta_cliente_auto", "Customer", __("Crear cuentas de clientes pendientes")],
+			["crear_cuenta_proveedor_auto", "Supplier", __("Crear cuentas de proveedores pendientes")],
+		];
+		for (const [field, party_type, label] of backfill) {
+			if (!frm.doc.pgc_espanol || !frm.doc[field]) {
+				continue;
+			}
+			frm.add_custom_button(
+				label,
+				() => {
+					frappe.confirm(
+						__(
+							"Se creará la cuenta contable de cada tercero con movimientos en {0} que aún no la tenga, siguiendo la secuencia configurada. ¿Continuar?",
+							[frm.doc.name.bold()]
+						),
+						() => {
+							frappe.call({
+								method: "spain_compliance.contabilidad.cuentas_tercero.crear_cuentas_pendientes_desde_company",
+								args: { company: frm.doc.name, party_type },
+								freeze: true,
+								callback() {
+									frappe.show_alert({
+										message: __("Creación de cuentas en curso. Recibirás un aviso al terminar."),
+										indicator: "blue",
+									});
+								},
+							});
+						}
+					);
+				},
+				__("Contabilidad España")
+			);
+		}
 	},
 });

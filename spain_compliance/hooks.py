@@ -45,6 +45,19 @@ override_doctype_class = {
 	"Account": "spain_compliance.overrides.account.SpainAccount",
 }
 
+doc_events = {
+	# PGC: cuenta auxiliar 430xxxxx / 400xxxxx por tercero (opción en Company)
+	"Company": {"validate": "spain_compliance.contabilidad.cuentas_tercero.validate_company"},
+	"Customer": {"after_insert": "spain_compliance.contabilidad.cuentas_tercero.on_party_insert"},
+	"Supplier": {"after_insert": "spain_compliance.contabilidad.cuentas_tercero.on_party_insert"},
+	"Sales Invoice": {
+		"before_validate": "spain_compliance.contabilidad.cuentas_tercero.on_invoice_before_validate"
+	},
+	"Purchase Invoice": {
+		"before_validate": "spain_compliance.contabilidad.cuentas_tercero.on_invoice_before_validate"
+	},
+}
+
 doctype_js = {
 	"Sales Invoice": "public/js/sales_invoice.js",
 	"Company": "public/js/company.js",

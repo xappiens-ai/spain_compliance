@@ -18,6 +18,18 @@ COMPANY_PGC_FIELDNAME = "pgc_espanol"
 COMPANY_RETURN_SERIES_FIELDNAME = "serie_rectificativas"
 COMPANY_DUDOSO_MONTHS_FIELDNAME = "meses_dudoso_cobro"
 
+# Cuentas auxiliares por tercero (430 clientes / 400 proveedores)
+COMPANY_CUSTOMER_AUTO_FIELDNAME = "crear_cuenta_cliente_auto"
+COMPANY_CUSTOMER_PREFIX_FIELDNAME = "prefijo_cuenta_cliente"
+COMPANY_CUSTOMER_DIGITS_FIELDNAME = "digitos_cuenta_cliente"
+COMPANY_SUPPLIER_AUTO_FIELDNAME = "crear_cuenta_proveedor_auto"
+COMPANY_SUPPLIER_PREFIX_FIELDNAME = "prefijo_cuenta_proveedor"
+COMPANY_SUPPLIER_DIGITS_FIELDNAME = "digitos_cuenta_proveedor"
+
+DEFAULT_CUSTOMER_PREFIX = "4300"
+DEFAULT_SUPPLIER_PREFIX = "4000"
+DEFAULT_ACCOUNT_DIGITS = 8
+
 DEFAULT_RETURN_SERIES = "{company_abbr}.R.YY.{#####}"
 
 # Created by an early draft of this app. ERPNext already exposes
@@ -75,6 +87,84 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 				"automáticamente a estado <b>Dudoso Cobro</b> (tarea diaria). 0 desactiva la "
 				"automatización. El artículo 13 de la Ley del Impuesto sobre Sociedades usa 6 meses."
 			),
+		},
+		{
+			"fieldname": "cuentas_tercero_section",
+			"label": "Cuentas de clientes y proveedores",
+			"fieldtype": "Section Break",
+			"insert_after": COMPANY_DUDOSO_MONTHS_FIELDNAME,
+			"collapsible": 1,
+			"depends_on": f"eval:doc.{COMPANY_PGC_FIELDNAME}",
+			"description": (
+				"Al dar de alta un cliente o proveedor se crea su cuenta auxiliar con el siguiente "
+				"número libre de la secuencia (p. ej. 43000001, 43000002 ...) y se asigna al tercero. "
+				"Los terceros sin cuenta la reciben al guardar su primera factura."
+			),
+		},
+		{
+			"fieldname": COMPANY_CUSTOMER_AUTO_FIELDNAME,
+			"label": "Crear cuenta de cliente automáticamente",
+			"fieldtype": "Check",
+			"insert_after": "cuentas_tercero_section",
+			"default": "0",
+		},
+		{
+			"fieldname": COMPANY_CUSTOMER_PREFIX_FIELDNAME,
+			"label": "Prefijo de cuentas de cliente",
+			"fieldtype": "Data",
+			"insert_after": COMPANY_CUSTOMER_AUTO_FIELDNAME,
+			"default": DEFAULT_CUSTOMER_PREFIX,
+			"depends_on": f"eval:doc.{COMPANY_CUSTOMER_AUTO_FIELDNAME}",
+			"mandatory_depends_on": f"eval:doc.{COMPANY_CUSTOMER_AUTO_FIELDNAME}",
+			"description": (
+				"Inicio común de los números de cuenta. Las tres primeras cifras indican el grupo "
+				"padre (430 Clientes), que debe existir en el árbol."
+			),
+		},
+		{
+			"fieldname": COMPANY_CUSTOMER_DIGITS_FIELDNAME,
+			"label": "Dígitos de cuentas de cliente",
+			"fieldtype": "Int",
+			"insert_after": COMPANY_CUSTOMER_PREFIX_FIELDNAME,
+			"default": str(DEFAULT_ACCOUNT_DIGITS),
+			"depends_on": f"eval:doc.{COMPANY_CUSTOMER_AUTO_FIELDNAME}",
+			"mandatory_depends_on": f"eval:doc.{COMPANY_CUSTOMER_AUTO_FIELDNAME}",
+			"description": "Longitud total del número de cuenta (prefijo incluido).",
+		},
+		{
+			"fieldname": "cuentas_tercero_column",
+			"fieldtype": "Column Break",
+			"insert_after": COMPANY_CUSTOMER_DIGITS_FIELDNAME,
+		},
+		{
+			"fieldname": COMPANY_SUPPLIER_AUTO_FIELDNAME,
+			"label": "Crear cuenta de proveedor automáticamente",
+			"fieldtype": "Check",
+			"insert_after": "cuentas_tercero_column",
+			"default": "0",
+		},
+		{
+			"fieldname": COMPANY_SUPPLIER_PREFIX_FIELDNAME,
+			"label": "Prefijo de cuentas de proveedor",
+			"fieldtype": "Data",
+			"insert_after": COMPANY_SUPPLIER_AUTO_FIELDNAME,
+			"default": DEFAULT_SUPPLIER_PREFIX,
+			"depends_on": f"eval:doc.{COMPANY_SUPPLIER_AUTO_FIELDNAME}",
+			"mandatory_depends_on": f"eval:doc.{COMPANY_SUPPLIER_AUTO_FIELDNAME}",
+			"description": (
+				"Inicio común de los números de cuenta. Las tres primeras cifras indican el grupo "
+				"padre (400 Proveedores, 410 Acreedores), que debe existir en el árbol."
+			),
+		},
+		{
+			"fieldname": COMPANY_SUPPLIER_DIGITS_FIELDNAME,
+			"label": "Dígitos de cuentas de proveedor",
+			"fieldtype": "Int",
+			"insert_after": COMPANY_SUPPLIER_PREFIX_FIELDNAME,
+			"default": str(DEFAULT_ACCOUNT_DIGITS),
+			"depends_on": f"eval:doc.{COMPANY_SUPPLIER_AUTO_FIELDNAME}",
+			"mandatory_depends_on": f"eval:doc.{COMPANY_SUPPLIER_AUTO_FIELDNAME}",
+			"description": "Longitud total del número de cuenta (prefijo incluido).",
 		},
 	],
 }

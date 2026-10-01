@@ -18,6 +18,9 @@ Spain Compliance lets each account keep **its own** `root_type` regardless of it
 - One-click conversion of an existing company chart to the 9-group tree (*Company → Contabilidad España → Convertir plan a PGC*): creates groups 1–9 and the two-digit subgroups, re-parents numbered accounts by prefix, deletes (or disables and re-parents) the leftover ERPNext standard accounts.
 - Financial statements include the full PGC hierarchy for PGC companies; non-PGC companies are untouched.
 
+### One ledger account per customer and supplier
+In the PGC each customer gets its own 430 sub-account and each supplier its own 400/410 sub-account. When enabled on a PGC company, Spain Compliance creates that account with the next free number (`43000001`, `43000002`…) when the party is created, and assigns it on the party's *Accounts* table. Parties created before enabling it get their account on their next invoice, or in bulk from the Company form. Off by default. Details: [docs/cuentas-tercero.md](docs/cuentas-tercero.md).
+
 ### Dedicated series for credit notes (facturas rectificativas)
 Spanish invoicing rules require rectifying invoices to use their own series. ERPNext copies the original invoice's series when creating a return. Configure **Serie de facturas rectificativas** on the Company (e.g. `{company_abbr}.R.YY.{#####}`) and every credit note created from the ordinary series is moved to it automatically, both server-side and in the form.
 
@@ -60,12 +63,15 @@ Everything is configured per **Company**, section *Contabilidad España*:
 | Plan General Contable (árbol de 9 grupos) | Enable per-account `root_type` and the PGC-aware financial statements. Set automatically by the conversion button. |
 | Serie de facturas rectificativas | Naming series forced on credit notes. Empty = ERPNext default behaviour. |
 | Meses hasta Dudoso Cobro | Months after due date before an unpaid invoice becomes *Dudoso Cobro*. 0 = off. |
+| Crear cuenta contable al dar de alta clientes / proveedores | Per-party ledger accounts (PGC companies only). Off by default. |
+| Prefijo / Dígitos de las cuentas | Account number prefix (`4300`, `4000`, `4100`…) and total length (8). |
 
 Access to `/contabilidad` is granted to *Accounts User*, *Accounts Manager* and *System Manager*.
 
 ## Documentation (Spanish)
 
 - [docs/series-facturas-abono.md](docs/series-facturas-abono.md) — series de facturas y rectificativas
+- [docs/cuentas-tercero.md](docs/cuentas-tercero.md) — cuentas 430/400 automáticas por cliente y proveedor
 - [docs/desarrollo.md](docs/desarrollo.md) — arquitectura y directrices de desarrollo
 - [docs/publicacion.md](docs/publicacion.md) — cómo se mantiene y publica la app (GitLab canónico, GitHub público)
 
@@ -81,6 +87,10 @@ yarn build    # → spain_compliance/public/frontend + www/contabilidad.html (bo
 # Backend
 bench --site <site> migrate
 bench --site <site> clear-cache && bench restart
+
+# Tests (use a disposable site with allow_tests, never production)
+bench --site <test-site> set-config allow_tests true
+bench --site <test-site> run-tests --app spain_compliance
 ```
 
 Pre-commit (ruff, prettier, eslint): `pre-commit install`.
