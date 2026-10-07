@@ -2,8 +2,9 @@ app_name = "spain_compliance"
 app_title = "Spain Compliance"
 app_publisher = "Xappiens"
 app_description = (
-	"Contabilidad española para ERPNext: Plan General Contable, series de facturas "
-	"rectificativas, estados de cobro (dudoso cobro / pérdida) e interfaz de contabilidad."
+	"Contabilidad española para ERPNext: Plan General Contable, correlatividad de "
+	"facturas, series de facturas rectificativas, estados de cobro "
+	"(dudoso cobro / pérdida) e interfaz de contabilidad."
 )
 app_email = "hello@xappiens.com"
 app_license = "mit"
@@ -39,7 +40,7 @@ before_uninstall = "spain_compliance.install.before_uninstall"
 # DocType overrides -------------------------------------------------------------
 
 override_doctype_class = {
-	# Credit-note naming series + collection statuses
+	# Credit-note naming series + correlatividad + collection statuses
 	"Sales Invoice": "spain_compliance.overrides.sales_invoice.SalesInvoice",
 	# PGC: each account keeps its own root_type inside the 9-group tree
 	"Account": "spain_compliance.overrides.account.SpainAccount",

@@ -10,6 +10,8 @@
    invoicing rules require a separate series for rectifying invoices. When a
    Company defines ``serie_rectificativas``, returns created from the ordinary
    series are moved to it before naming.
+3. Correlatividad de serie y fecha (RD 1619/2012): no fechas futuras al guardar
+   (el número se reserva entonces) y orden cronológico dentro de la serie.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from erpnext.accounts.doctype.sales_invoice.sales_invoice import (
 from frappe import _
 from frappe.utils import flt
 
+from spain_compliance.contabilidad.correlatividad import validate_sales_invoice_correlatividad
 from spain_compliance.setup.custom_fields import COMPANY_RETURN_SERIES_FIELDNAME
 
 LOSS_STATUSES = frozenset({"Dudoso Cobro", "Pérdida"})
@@ -56,6 +59,10 @@ class SalesInvoice(ERPNextSalesInvoice):
 		# ERPNext's SalesInvoice defines no before_naming; frappe.model.naming calls this hook.
 		self._ensure_company_abbr()
 		self._apply_return_naming_series()
+
+	def validate(self):
+		super().validate()
+		validate_sales_invoice_correlatividad(self)
 
 	# Naming series for credit notes ----------------------------------------
 

@@ -2,7 +2,7 @@
   <img src="spain_compliance/public/images/logo.svg" width="72" alt="Spain Compliance" />
   <h1>Spain Compliance</h1>
   <p>Spanish accounting and compliance for <a href="https://github.com/frappe/erpnext">ERPNext</a>.</p>
-  <p><i>Contabilidad española para ERPNext: Plan General Contable, series de facturas rectificativas, estados de cobro e interfaz de contabilidad.</i></p>
+  <p><i>Contabilidad española para ERPNext: Plan General Contable, correlatividad de facturas, series de facturas rectificativas, estados de cobro e interfaz de contabilidad.</i></p>
 </div>
 
 ---
@@ -20,6 +20,9 @@ Spain Compliance lets each account keep **its own** `root_type` regardless of it
 
 ### One ledger account per customer and supplier
 In the PGC each customer gets its own 430 sub-account and each supplier its own 400/410 sub-account. When enabled on a PGC company, Spain Compliance creates that account with the next free number (`43000001`, `43000002`…) when the party is created, and assigns it on the party's *Accounts* table. Parties created before enabling it get their account on their next invoice, or in bulk from the Company form. Off by default. Details: [docs/cuentas-tercero.md](docs/cuentas-tercero.md).
+
+### Invoice correlativity (series + date)
+Spanish invoicing rules require consecutive numbering within each series, in chronological order. Spain Compliance enforces this on every Sales Invoice save: posting date cannot be in the future (the number is reserved on save, not on submit), and a higher number cannot have an earlier posting date than a lower number in the same company and naming series (drafts, submitted and cancelled all count). Details: [docs/correlatividad-facturas.md](docs/correlatividad-facturas.md).
 
 ### Dedicated series for credit notes (facturas rectificativas)
 Spanish invoicing rules require rectifying invoices to use their own series. ERPNext copies the original invoice's series when creating a return. Configure **Serie de facturas rectificativas** on the Company (e.g. `{company_abbr}.R.YY.{#####}`) and every credit note created from the ordinary series is moved to it automatically, both server-side and in the form.
@@ -70,6 +73,7 @@ Access to `/contabilidad` is granted to *Accounts User*, *Accounts Manager* and 
 
 ## Documentation (Spanish)
 
+- [docs/correlatividad-facturas.md](docs/correlatividad-facturas.md) — correlatividad serie + fecha y Auto Repeat
 - [docs/series-facturas-abono.md](docs/series-facturas-abono.md) — series de facturas y rectificativas
 - [docs/cuentas-tercero.md](docs/cuentas-tercero.md) — cuentas 430/400 automáticas por cliente y proveedor
 - [docs/desarrollo.md](docs/desarrollo.md) — arquitectura y directrices de desarrollo

@@ -42,7 +42,7 @@ Apps screen  →  /contabilidad
                    createListResource → DocTypes ERPNext
 
 ERPNext Desk
-  Sales Invoice  ← override (serie rectificativa, Dudoso Cobro / Pérdida) + public/js/sales_invoice.js
+  Sales Invoice  ← override (correlatividad, serie rectificativa, Dudoso Cobro / Pérdida) + public/js/sales_invoice.js
   Account        ← override (root_type propio en compañías PGC)
   Company        ← Custom Fields + public/js/company.js (conversión PGC, cuentas de tercero pendientes)
   Customer / Supplier / facturas ← doc_events: subcuenta 430/400 por tercero (cuentas_tercero.py)
@@ -64,7 +64,8 @@ ERPNext Desk
 | `hooks.py` | `required_apps`, `add_to_apps_screen`, `website_route_rules`, overrides, `doctype_js`, scheduler |
 | `install.py` | `after_install` / `after_migrate` / `before_uninstall`: Custom Fields y Property Setter de `Sales Invoice.status` |
 | `setup/custom_fields.py` | Definición única de los Custom Fields de la app |
-| `overrides/sales_invoice.py` | Serie rectificativa por Company; estados Dudoso Cobro / Pérdida; API `set_cobro_status` |
+| `overrides/sales_invoice.py` | Correlatividad; serie rectificativa por Company; estados Dudoso Cobro / Pérdida; API `set_cobro_status` |
+| `contabilidad/correlatividad.py` | Serie + fecha (RD 1619/2012); bloqueo de fecha futura al guardar ([correlatividad-facturas.md](correlatividad-facturas.md)) |
 | `overrides/account.py` | `root_type` propio por cuenta en compañías PGC |
 | `contabilidad/plan_contable.py` | Grupos/subgrupos PGC, `reestructurar_arbol`, API `convertir_plan_a_pgc` |
 | `contabilidad/cuentas_tercero.py` | Subcuenta por cliente/proveedor con secuencia PGC; backfill `crear_cuentas_pendientes` ([cuentas-tercero.md](cuentas-tercero.md)) |

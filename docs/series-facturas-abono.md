@@ -38,3 +38,7 @@ Cada prefijo resuelto tiene su contador, p. ej. `ACMEF26` y `ACMER26`. **Cancela
 - Emitir rectificativas en la serie ordinaria.
 - Reutilizar a mano un número ya emitido.
 - Bajar un contador por debajo de un documento que **aún existe**.
+
+## Correlatividad (serie + fecha)
+
+Además de la serie propia de abonos, dentro de **cada** serie la numeración debe ser correlativa y cronológica. La app lo valida en servidor (sin interruptor). Detalle y patrón correcto con Auto Repeat: [correlatividad-facturas.md](correlatividad-facturas.md).
