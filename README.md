@@ -71,7 +71,7 @@ Everything is configured per **Company**, section *Contabilidad España*:
 | Serie de facturas rectificativas | Naming series forced on credit notes. Empty = ERPNext default behaviour. |
 | Meses hasta Dudoso Cobro | Months after due date before an unpaid invoice becomes *Dudoso Cobro*. 0 = off. |
 | Régimen de IVA / Periodicidad del 303 / Prorrata / Modelo de cuentas anuales | Used by the VAT register and, later, by the tax forms. |
-| Exigir clasificación fiscal | Block invoices whose taxes are not classified. Off by default: the invoice posts and the VAT row is flagged as pending. |
+| Exigir clasificación fiscal | Block submitting invoices whose taxes are not classified. Drafts can still be saved. Off by default: the invoice posts and the VAT row is flagged as pending. |
 | Crear cuenta contable al dar de alta clientes / proveedores | Per-party ledger accounts (PGC companies only). Off by default. |
 | Prefijo / Dígitos de las cuentas | Account number prefix (`4300`, `4000`, `4100`…) and total length (8). |
 

@@ -12,7 +12,7 @@ En cada fila de impuesto (y en la plantilla, que es el mismo dato) sección *Cla
 |-------|-----|
 | Tipo de impuesto | IVA, recargo de equivalencia, retención de IRPF, IGIC, IPSI u otro. |
 | Clave de IVA | Sujeta, exenta (por artículo), no sujeta, inversión del sujeto pasivo, intracomunitaria, importación, exportación… El código (`S1`, `E1`, `AIB`) es lo que usarán los modelos. |
-| Deducibilidad | Solo compras: corriente (aplica la prorrata de la compañía), bien de inversión (se deduce entero) o no deducible. |
+| Deducibilidad | Solo compras de IVA, recargo, IGIC o IPSI: corriente o bien de inversión (los dos aplican la prorrata de la compañía) o no deducible. |
 | Clave de retención | Trabajo, actividades económicas, arrendamiento, capital mobiliario o premios. |
 
 En **Item Tax Template**, *Clave de IVA* sustituye a la de la fila de impuesto para los artículos que usen esa plantilla. Sirve para una factura con operaciones de distinta clave (sujeta y exenta).
@@ -28,14 +28,14 @@ Por cada fila de impuesto con tipo informado, o sin tipo pero con cuenta de tipo
 - Tercero, con el NIF y el tipo de identificación tal como estaban al validar. País `ES` si el NIF es español; si es NIF-IVA, las dos letras del país.
 - Tipo de factura `F1`, o `R1` si es rectificativa, con la factura rectificada.
 - Base, tipo y cuota en moneda de la compañía. Una rectificativa queda en negativo, así que el trimestre cuadra al sumar.
-- En compras, cuota deducible: cero si no es deducible, la cuota entera en un bien de inversión, y la cuota por la prorrata general en el resto. La prorrata vacía cuenta como 100 %.
+- En compras de IVA, recargo, IGIC o IPSI, cuota deducible: cero si no es deducible; en corriente y en bien de inversión, la cuota por la prorrata general. La prorrata vacía cuenta como 100 %. La regularización de los bienes de inversión en años posteriores queda para el modelo 303.
 - *Pendiente de clasificar* si falta el tipo, la clave o, en compras, la deducibilidad.
 
 La base sale de la cuota y el tipo (`cuota × 100 / tipo`). Al 0 % se usa el neto de los artículos de esa clave.
 
 ## Aviso o bloqueo
 
-Por defecto la factura se valida igual y las filas quedan pendientes de clasificar, con un aviso. **Exigir clasificación fiscal** en la compañía (sección *Fiscalidad*) impide validarla hasta que cada impuesto tenga tipo, clave y, en compras, deducibilidad.
+Por defecto la factura se valida igual y las filas quedan pendientes de clasificar, con un aviso. **Exigir clasificación fiscal** en la compañía (sección *Fiscalidad*) impide validarla —el borrador se guarda— hasta que cada impuesto tenga tipo, clave (también IGIC e IPSI) y, en compras, deducibilidad.
 
 ## Identificación del tercero
 

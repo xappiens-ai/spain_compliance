@@ -17,6 +17,8 @@ TIPO_IPSI = "IPSI"
 TIPO_OTRO = "Otro"
 
 TIPOS_IVA = (TIPO_IVA, TIPO_RE)
+# Llevan clave de operación y, en compras, deducibilidad. La prorrata se aplica a todos.
+TIPOS_CON_CLAVE = (TIPO_IVA, TIPO_RE, TIPO_IGIC, TIPO_IPSI)
 
 DEDUCIBLE_CORRIENTE = "Corriente"
 DEDUCIBLE_BIEN = "Bien de inversión"

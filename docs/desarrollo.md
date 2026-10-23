@@ -46,7 +46,7 @@ ERPNext Desk
   Account        ← override (root_type propio en compañías PGC)
   Company        ← Custom Fields + public/js/company.js (conversión PGC, cuentas de tercero pendientes)
   Customer / Supplier ← doc_events: subcuenta 430/400 (cuentas_tercero.py); aviso de NIF (identificacion.py)
-  Sales / Purchase Invoice ← doc_events: Registro Fiscal IVA al validar, anulado al cancelar
+  Sales / Purchase Invoice ← doc_events: copia la clasificación al guardar; exigencia al validar; Registro Fiscal IVA al submit; anulado al cancelar
   Informes financieros ← monkey_patches.py (Balance / PyG con árbol PGC)
 ```
 

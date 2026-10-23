@@ -60,12 +60,14 @@ doc_events = {
 	"Sales Invoice": {
 		"before_validate": "spain_compliance.contabilidad.cuentas_tercero.on_invoice_before_validate",
 		"validate": "spain_compliance.contabilidad.registro_fiscal.validar_factura",
+		"before_submit": "spain_compliance.contabilidad.registro_fiscal.before_submit",
 		"on_submit": "spain_compliance.contabilidad.registro_fiscal.on_submit",
 		"on_cancel": "spain_compliance.contabilidad.registro_fiscal.on_cancel",
 	},
 	"Purchase Invoice": {
 		"before_validate": "spain_compliance.contabilidad.cuentas_tercero.on_invoice_before_validate",
 		"validate": "spain_compliance.contabilidad.registro_fiscal.validar_factura",
+		"before_submit": "spain_compliance.contabilidad.registro_fiscal.before_submit",
 		"on_submit": "spain_compliance.contabilidad.registro_fiscal.on_submit",
 		"on_cancel": "spain_compliance.contabilidad.registro_fiscal.on_cancel",
 	},

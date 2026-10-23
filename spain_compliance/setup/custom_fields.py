@@ -90,7 +90,10 @@ def _clasificacion_impuesto(insert_after: str) -> list[dict]:
 			"fieldtype": "Select",
 			"options": DEDUCIBLE_OPTIONS,
 			"insert_after": "clave_iva",
-			"description": "Solo compras. Corriente aplica la prorrata de la compañía; un bien de inversión se deduce entero.",
+			"description": (
+				"Solo compras. Corriente y bien de inversión aplican la prorrata de la compañía. "
+				"No deducible deja la cuota deducible a cero."
+			),
 		},
 		{
 			"fieldname": "clave_retencion",
@@ -297,8 +300,8 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"insert_after": "fiscalidad_column",
 			"default": "100",
 			"description": (
-				"Porcentaje de IVA soportado corriente que se considera deducible al generar el "
-				"registro. 100 es deducción completa."
+				"Porcentaje de IVA soportado que se considera deducible al generar el registro, "
+				"tanto en operaciones corrientes como en bienes de inversión. 100 es deducción completa."
 			),
 		},
 		{
@@ -319,8 +322,9 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"insert_after": "prorrata_especial",
 			"default": "0",
 			"description": (
-				"Impide validar facturas con impuestos sin tipo, clave o, en compras, deducibilidad. "
-				"Desactivado: la factura se valida y el registro queda pendiente de clasificar."
+				"Impide validar la factura (el borrador se puede guardar) si hay impuestos sin tipo, "
+				"clave o, en compras, deducibilidad. Desactivado: se valida y el registro queda "
+				"pendiente de clasificar."
 			),
 		},
 		{

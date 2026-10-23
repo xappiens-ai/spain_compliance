@@ -22,12 +22,11 @@ from frappe import _
 from frappe.utils import cint, flt, getdate
 
 from spain_compliance.contabilidad.clasificacion import (
-	DEDUCIBLE_BIEN,
 	DEDUCIBLE_NO,
 	LIBRO_EXPEDIDAS,
 	LIBRO_RECIBIDAS,
 	TIPO_RETENCION,
-	TIPOS_IVA,
+	TIPOS_CON_CLAVE,
 )
 from spain_compliance.contabilidad.identificacion import nif_espanol_valido, normalizar_identificador
 from spain_compliance.setup.custom_fields import (
@@ -53,7 +52,15 @@ def aplica_registro_fiscal(company: str | None) -> bool:
 
 
 def validar_factura(doc, method=None):
+	"""Al guardar, también en borrador: copia la clasificación de la plantilla."""
 	if not aplica_registro_fiscal(doc.company) or doc.docstatus == 2:
+		return
+	copiar_clasificacion(doc)
+
+
+def before_submit(doc, method=None):
+	"""La exigencia bloquea la validación, no el borrador."""
+	if not aplica_registro_fiscal(doc.company):
 		return
 	copiar_clasificacion(doc)
 	if not cint(frappe.db.get_value("Company", doc.company, "exigir_clasificacion_fiscal")):
@@ -353,24 +360,24 @@ def _incompleta(doc, tax, parte) -> bool:
 	tipo = tax.get("tipo_impuesto")
 	if not tipo:
 		return True
-	if tipo in TIPOS_IVA and not parte.get("clave"):
+	if tipo in TIPOS_CON_CLAVE and not parte.get("clave"):
 		return True
 	if tipo == TIPO_RETENCION and not tax.get("clave_retencion"):
 		return True
-	return doc.doctype == "Purchase Invoice" and tipo in TIPOS_IVA and not tax.get("deducible_iva")
+	return doc.doctype == "Purchase Invoice" and tipo in TIPOS_CON_CLAVE and not tax.get("deducible_iva")
 
 
 def _fila(doc, tax, parte, cabecera, compania) -> dict:
 	tipo = tax.get("tipo_impuesto") or ""
-	es_iva = tipo in TIPOS_IVA
+	es_impuesto = tipo in TIPOS_CON_CLAVE
 	es_retencion = tipo == TIPO_RETENCION
 	cuota = parte["cuota"]
 	fila = {
 		**cabecera,
 		"tax_row": tax.get("name"),
 		"tipo_impuesto": tipo,
-		"clave_iva": parte.get("clave") if es_iva or not tipo else None,
-		"deducible_iva": tax.get("deducible_iva") if es_iva else None,
+		"clave_iva": None if es_retencion else parte.get("clave"),
+		"deducible_iva": tax.get("deducible_iva") if es_impuesto else None,
 		"clave_retencion": tax.get("clave_retencion") if es_retencion else None,
 		"base_imponible": parte["base"],
 		"tipo_impositivo": parte["rate"],
@@ -382,12 +389,12 @@ def _fila(doc, tax, parte, cabecera, compania) -> dict:
 
 
 def _cuota_deducible(doc, tipo, deducible, cuota, compania) -> float:
-	if doc.doctype != "Purchase Invoice" or tipo not in TIPOS_IVA:
+	if doc.doctype != "Purchase Invoice" or tipo not in TIPOS_CON_CLAVE:
 		return 0
 	if deducible == DEDUCIBLE_NO:
 		return 0
-	if deducible == DEDUCIBLE_BIEN:
-		return cuota
+	# Corriente y bien de inversión: la prorrata del año de la compra. La regularización
+	# de los años siguientes (arts. 107 a 110 LIVA) se hará en el modelo 303.
 	prorrata = compania.prorrata_general
 	if prorrata is None:
 		prorrata = 100

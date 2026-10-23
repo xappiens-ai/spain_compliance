@@ -11,7 +11,9 @@ from frappe.utils import add_days, nowdate
 from spain_compliance.contabilidad.clasificacion import (
 	CLAVE_RETENCION_PROFESIONAL,
 	CLAVE_SUJETA,
+	DEDUCIBLE_BIEN,
 	DEDUCIBLE_CORRIENTE,
+	TIPO_IGIC,
 	TIPO_IVA,
 	TIPO_RETENCION,
 	etiqueta,
@@ -236,24 +238,46 @@ class TestRegistroFiscal(FrappeTestCase):
 		self.assertEqual(filas[0].sin_clasificar, 1)
 		self.assertEqual(filas[0].cuota, 21)
 
-	def test_exigir_clasificacion_bloquea(self):
+	def test_exigir_clasificacion_bloquea_al_validar_y_no_el_borrador(self):
 		frappe.db.set_value("Company", COMPANY, "exigir_clasificacion_fiscal", 1)
-		nueva = frappe.get_doc(
-			{
-				"doctype": "Sales Invoice",
-				"company": COMPANY,
-				"customer": CUSTOMER,
-				"naming_series": "SCRF-.YYYY.-",
-				"posting_date": nowdate(),
-				"due_date": add_days(nowdate(), 15),
-				"currency": "EUR",
-				"items": [{"item_code": ITEM, "qty": 1, "rate": 100}],
-			}
-		)
-		nueva.set_missing_values()
-		nueva.append("taxes", self._impuesto())
+		borrador = self._venta([self._impuesto()])
+		self.assertEqual(borrador.docstatus, 0)
 		with self.assertRaises(frappe.ValidationError):
-			nueva.insert()
+			borrador.submit()
+		borrador.reload()
+		self.assertEqual(borrador.docstatus, 0)
+		self.assertFalse(frappe.db.exists("Registro Fiscal IVA", {"voucher_no": borrador.name}))
+
+	def test_bien_de_inversion_aplica_prorrata(self):
+		frappe.db.set_value("Company", COMPANY, "prorrata_general", 50)
+		inv = self._compra(
+			[
+				self._impuesto(
+					tipo_impuesto=TIPO_IVA,
+					clave_iva=CLAVE_SUJETA,
+					deducible_iva=DEDUCIBLE_BIEN,
+				)
+			],
+			rate=200,
+		)
+		inv.submit()
+		fila = _registros(inv.name)[0]
+		self.assertEqual(fila.cuota, 42)
+		self.assertEqual(fila.cuota_deducible, 21)
+
+	def test_igic_conserva_la_clave_y_sin_ella_queda_pendiente(self):
+		con_clave = self._venta([self._impuesto(tipo_impuesto=TIPO_IGIC, clave_iva=CLAVE_SUJETA, rate=7)])
+		con_clave.submit()
+		fila = _registros(con_clave.name)[0]
+		self.assertEqual(fila.tipo_impuesto, TIPO_IGIC)
+		self.assertEqual(fila.clave_iva, CLAVE_SUJETA)
+		self.assertEqual(fila.sin_clasificar, 0)
+		self.assertEqual(fila.cuota, 7)
+
+		sin_clave = self._venta([self._impuesto(tipo_impuesto=TIPO_IGIC, rate=7, description="IGIC")])
+		sin_clave.submit()
+		self.assertEqual(_registros(sin_clave.name)[0].sin_clasificar, 1)
+		self.assertFalse(_registros(sin_clave.name)[0].clave_iva)
 
 	def test_compra_prorrata_y_retencion(self):
 		frappe.db.set_value("Company", COMPANY, "prorrata_general", 50)
