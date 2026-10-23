@@ -17,28 +17,32 @@ from frappe.query_builder.functions import Coalesce, Count, Sum
 from frappe.utils import cint, flt, getdate, today
 
 from spain_compliance.api.permission import has_app_permission
+from spain_compliance.contabilidad.clasificacion import TIPOS_CON_CLAVE
 
 _LIBROS = ("Expedidas", "Recibidas")
 _MAX_FILAS = 500
+# IVA, recargo, IGIC e IPSI. Retención IRPF y «Otro» viven en el mismo registro
+# pero no forman parte del libro ni de la liquidación de IVA.
+_TIPOS_LIBRO_IVA = TIPOS_CON_CLAVE
 _CAMPOS_AJUSTES = (
-	("pgc_espanol", "Check"),
-	("serie_rectificativas", "Data"),
-	("meses_dudoso_cobro", "Int"),
-	("regimen_iva", "Data"),
-	("periodicidad_modelo_303", "Data"),
-	("modelo_cuentas_anuales", "Data"),
-	("epigrafe_iae", "Data"),
-	("prorrata_general", "Percent"),
-	("prorrata_especial", "Check"),
-	("exigir_clasificacion_fiscal", "Check"),
-	("crear_cuenta_cliente_auto", "Check"),
-	("prefijo_cuenta_cliente", "Data"),
-	("digitos_cuenta_cliente", "Int"),
-	("crear_cuenta_proveedor_auto", "Check"),
-	("prefijo_cuenta_proveedor", "Data"),
-	("digitos_cuenta_proveedor", "Int"),
-	("contacto_aeat", "Data"),
-	("telefono_aeat", "Data"),
+	"pgc_espanol",
+	"serie_rectificativas",
+	"meses_dudoso_cobro",
+	"regimen_iva",
+	"periodicidad_modelo_303",
+	"modelo_cuentas_anuales",
+	"epigrafe_iae",
+	"prorrata_general",
+	"prorrata_especial",
+	"exigir_clasificacion_fiscal",
+	"crear_cuenta_cliente_auto",
+	"prefijo_cuenta_cliente",
+	"digitos_cuenta_cliente",
+	"crear_cuenta_proveedor_auto",
+	"prefijo_cuenta_proveedor",
+	"digitos_cuenta_proveedor",
+	"contacto_aeat",
+	"telefono_aeat",
 )
 _ROOT_LABEL = {
 	"Asset": "Activo",
@@ -186,6 +190,7 @@ def _filtros_libro(company, libro, inicio, fin, incluir_anulados):
 		query_filters = query_filters & (Doc.libro == libro)
 	if not cint(incluir_anulados):
 		query_filters = query_filters & (Doc.anulado == 0)
+	query_filters = query_filters & Doc.tipo_impuesto.isin(_TIPOS_LIBRO_IVA)
 	return Doc, query_filters
 
 
@@ -618,7 +623,7 @@ def ajustes(company: str) -> dict:
 	meta = frappe.get_meta("Company")
 	doc = frappe.get_cached_doc("Company", company)
 	campos = []
-	for fieldname, fieldtype in _CAMPOS_AJUSTES:
+	for fieldname in _CAMPOS_AJUSTES:
 		if not meta.has_field(fieldname):
 			continue
 		df = meta.get_field(fieldname)
@@ -626,7 +631,7 @@ def ajustes(company: str) -> dict:
 			{
 				"fieldname": fieldname,
 				"label": df.label,
-				"fieldtype": fieldtype,
+				"fieldtype": df.fieldtype,
 				"value": doc.get(fieldname),
 			}
 		)
