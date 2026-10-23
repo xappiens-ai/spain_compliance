@@ -13,6 +13,7 @@ import LucideLayers from '~icons/lucide/layers'
 import LucideTrendingUp from '~icons/lucide/trending-up'
 import LucideScale from '~icons/lucide/scale'
 import LucideSigma from '~icons/lucide/sigma'
+import LucideBookMarked from '~icons/lucide/book-marked'
 import LucideTags from '~icons/lucide/tags'
 import LucidePercent from '~icons/lucide/percent'
 import LucideSend from '~icons/lucide/send'
@@ -143,6 +144,11 @@ export const navigation = [
         label: 'Sumas y saldos',
         icon: markRaw(LucideSigma),
       },
+      {
+        name: 'VatBook',
+        label: 'Libro de IVA',
+        icon: markRaw(LucideBookMarked),
+      },
     ],
   },
   {
@@ -157,7 +163,7 @@ export const navigation = [
       },
       {
         name: 'TaxReturns',
-        label: 'Modelos Hacienda',
+        label: 'Liquidación de IVA',
         icon: markRaw(LucideClipboardList),
       },
     ],

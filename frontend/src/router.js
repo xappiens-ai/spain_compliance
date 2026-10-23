@@ -298,11 +298,7 @@ const routes = [
   {
     path: '/parties',
     name: 'Parties',
-    ...placeholder(
-      'Terceros',
-      'Vista unificada de clientes y proveedores (como Party en Frappe Books). Por ahora usa Clientes y Proveedores.',
-      'contact',
-    ),
+    component: () => import('@/pages/Parties.vue'),
   },
   {
     path: '/items',
@@ -358,38 +354,40 @@ const routes = [
   {
     path: '/general-ledger',
     name: 'GeneralLedger',
-    ...placeholder(
-      'Libro mayor',
-      'Consulta de movimientos por cuenta y periodo (informe ERPNext General Ledger).',
-      'layers',
-    ),
+    component: () => import('@/pages/GeneralLedger.vue'),
   },
   {
     path: '/profit-and-loss',
     name: 'ProfitAndLoss',
-    ...placeholder(
-      'Pérdidas y ganancias',
-      'Cuenta de resultados: ingresos, costes y beneficio del periodo.',
-      'trending-up',
-    ),
+    component: () => import('@/pages/StatementPage.vue'),
+    props: {
+      title: 'Pérdidas y ganancias',
+      method: 'spain_compliance.api.informes.perdidas_y_ganancias',
+    },
   },
   {
     path: '/balance-sheet',
     name: 'BalanceSheet',
-    ...placeholder(
-      'Balance de situación',
-      'Activo, pasivo y patrimonio neto a una fecha determinada.',
-      'scale',
-    ),
+    component: () => import('@/pages/StatementPage.vue'),
+    props: {
+      title: 'Balance de situación',
+      method: 'spain_compliance.api.informes.balance_situacion',
+      asOf: true,
+    },
   },
   {
     path: '/trial-balance',
     name: 'TrialBalance',
-    ...placeholder(
-      'Sumas y saldos',
-      'Comprobación de cuadre de débitos y créditos por cuenta.',
-      'sigma',
-    ),
+    component: () => import('@/pages/StatementPage.vue'),
+    props: {
+      title: 'Sumas y saldos',
+      method: 'spain_compliance.api.informes.sumas_y_saldos',
+    },
+  },
+  {
+    path: '/vat-book',
+    name: 'VatBook',
+    component: () => import('@/pages/VatBook.vue'),
   },
 
   // Cumplimiento (España)
@@ -414,22 +412,14 @@ const routes = [
   {
     path: '/tax-returns',
     name: 'TaxReturns',
-    ...placeholder(
-      'Modelos de Hacienda',
-      'Modelos 303, 390, 347, 111, 190 y resto de declaraciones.',
-      'clipboard-list',
-    ),
+    component: () => import('@/pages/VatSettlement.vue'),
   },
 
   // Configuración (Books Setup)
   {
     path: '/chart-of-accounts',
     name: 'ChartOfAccounts',
-    ...placeholder(
-      'Plan de cuentas',
-      'Árbol del Plan General Contable español y cuentas de la compañía.',
-      'book-open',
-    ),
+    component: () => import('@/pages/ChartOfAccounts.vue'),
   },
   {
     path: '/tax-templates',
@@ -454,11 +444,7 @@ const routes = [
   {
     path: '/settings',
     name: 'Settings',
-    ...placeholder(
-      'Ajustes',
-      'Parámetros fiscales, certificados AEAT y opciones de la compañía.',
-      'settings',
-    ),
+    component: () => import('@/pages/Settings.vue'),
   },
 
   {

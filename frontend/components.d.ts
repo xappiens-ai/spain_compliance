@@ -13,6 +13,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     AppHeader: typeof import('./src/components/Layouts/AppHeader.vue')['default']
     AppSidebar: typeof import('./src/components/Layouts/AppSidebar.vue')['default']
+    ClaveTable: typeof import('./src/components/ClaveTable.vue')['default']
     DesktopLayout: typeof import('./src/components/Layouts/DesktopLayout.vue')['default']
     EmptyState: typeof import('./src/components/EmptyState.vue')['default']
     InvoiceProgress: typeof import('./src/components/dashboard/InvoiceProgress.vue')['default']
@@ -20,6 +21,7 @@ declare module 'vue' {
     ListViewBuilder: typeof import('./src/components/ListViewBuilder.vue')['default']
     MobileLayout: typeof import('./src/components/Layouts/MobileLayout.vue')['default']
     RecentInvoices: typeof import('./src/components/dashboard/RecentInvoices.vue')['default']
+    ReportFrame: typeof import('./src/components/ReportFrame.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     UserDropdown: typeof import('./src/components/UserDropdown.vue')['default']

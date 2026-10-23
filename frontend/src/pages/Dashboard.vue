@@ -221,7 +221,8 @@ import LucideShoppingCart from '~icons/lucide/shopping-cart'
 import LucideBookOpen from '~icons/lucide/book-open'
 import LucideLayers from '~icons/lucide/layers'
 import LucideTrendingUp from '~icons/lucide/trending-up'
-import LucideSend from '~icons/lucide/send'
+import LucideScale from '~icons/lucide/scale'
+import LucideBookMarked from '~icons/lucide/book-marked'
 
 const period = ref('this_year')
 
@@ -398,9 +399,14 @@ const shortcuts = [
     icon: markRaw(LucideTrendingUp),
   },
   {
-    name: 'SII',
-    label: 'SII',
-    icon: markRaw(LucideSend),
+    name: 'BalanceSheet',
+    label: 'Balance',
+    icon: markRaw(LucideScale),
+  },
+  {
+    name: 'VatBook',
+    label: 'Libro de IVA',
+    icon: markRaw(LucideBookMarked),
   },
 ]
 

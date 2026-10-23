@@ -79,6 +79,7 @@ ERPNext Desk
 | `www/contabilidad.py` | Contexto SPA: Guest → login, `has_app_permission`, `get_boot` |
 | `api/permission.py` | Accounts User / Manager / System Manager / Administrator |
 | `api/dashboard.py` | Métricas del tablero |
+| `api/informes.py` | PyG, balance, sumas y saldos, libro mayor, libro de IVA, liquidación, plan de cuentas y ajustes |
 | `public/js/*.js` | Form scripts de Desk (Sales Invoice, Company) |
 | `patches/` | Migraciones de datos (`patches.txt`) |
 | `tests/` | Tests de integración (`FrappeTestCase`) |
