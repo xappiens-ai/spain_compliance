@@ -6,14 +6,15 @@
 Los estados contables (PyG, balance, sumas y saldos) reutilizan el motor de
 ERPNext, ya parcheado para el árbol PGC, y devuelven un JSON propio de la SPA.
 El libro de IVA y la liquidación salen de ``Registro Fiscal IVA``.
-El libro mayor y el plan de cuentas se consultan aquí, sin el informe de Desk.
+El libro diario, el libro mayor y el plan de cuentas se consultan aquí,
+sin el informe de Desk.
 """
 
 from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.query_builder.functions import Coalesce, Count, Sum
+from frappe.query_builder.functions import Coalesce, Count, Max, Min, Sum
 from frappe.utils import cint, flt, getdate, today
 
 from spain_compliance.api.permission import has_app_permission
@@ -448,6 +449,231 @@ def libro_mayor(company: str, from_date: str, to_date: str, account: str | None 
 		"rows": rows,
 		"total": int(total or 0),
 		"truncated": int(total or 0) > len(rows),
+	}
+
+
+def _condicion_gl(GL, company, inicio, fin, finance_book):
+	return (
+		(GL.company == company)
+		& (GL.posting_date >= inicio)
+		& (GL.posting_date <= fin)
+		& (GL.is_cancelled == 0)
+		& (GL.finance_book.isnull() | GL.finance_book.isin(["", finance_book or ""]))
+	)
+
+
+def _ejercicio_unico(company, inicio, fin):
+	nombre, fy_start, fy_end = _ejercicio(company, inicio)
+	otro, _, _ = _ejercicio(company, fin)
+	if nombre != otro:
+		frappe.throw(_("El libro diario se consulta dentro de un mismo ejercicio"))
+	return nombre, fy_start, fy_end
+
+
+def _clase_asiento(voucher_type: str, is_opening: str | None) -> str:
+	# Código de Comercio: apertura, asiento ordinario y regularización (cierre de PyG).
+	if is_opening == "Yes":
+		return "Apertura"
+	if voucher_type == "Period Closing Voucher":
+		return "Regularización"
+	return "Diario"
+
+
+def _numeracion_asientos(company, desde, hasta, finance_book) -> dict:
+	"""Número correlativo por comprobante, desde el inicio del ejercicio."""
+	GL = frappe.qb.DocType("GL Entry")
+	filas = (
+		frappe.qb.from_(GL)
+		.select(
+			GL.voucher_type,
+			GL.voucher_no,
+			Min(GL.posting_date).as_("posting_date"),
+			Min(GL.creation).as_("creation"),
+			Max(GL.is_opening).as_("is_opening"),
+		)
+		.where(_condicion_gl(GL, company, desde, hasta, finance_book))
+		.groupby(GL.voucher_type, GL.voucher_no)
+		.orderby(Min(GL.posting_date))
+		.orderby(Min(GL.creation))
+		.orderby(GL.voucher_type)
+		.orderby(GL.voucher_no)
+		.run(as_dict=True)
+	)
+	return {
+		(row.voucher_type, row.voucher_no): {
+			"numero": index,
+			"posting_date": row.posting_date,
+			"is_opening": row.is_opening or "No",
+		}
+		for index, row in enumerate(filas, start=1)
+	}
+
+
+def _conceptos_asiento(claves: list[tuple[str, str]]) -> dict:
+	por_tipo: dict[str, list[str]] = {}
+	for voucher_type, voucher_no in claves:
+		por_tipo.setdefault(voucher_type, []).append(voucher_no)
+	out = {}
+	if por_tipo.get("Journal Entry"):
+		for row in frappe.get_all(
+			"Journal Entry",
+			filters={"name": ["in", por_tipo["Journal Entry"]]},
+			fields=["name", "user_remark", "title"],
+		):
+			out[("Journal Entry", row.name)] = (row.user_remark or row.title or "").strip()
+	if por_tipo.get("Payment Entry"):
+		for row in frappe.get_all(
+			"Payment Entry",
+			filters={"name": ["in", por_tipo["Payment Entry"]]},
+			fields=["name", "remarks"],
+		):
+			out[("Payment Entry", row.name)] = (row.remarks or "").strip()
+	return out
+
+
+def _recortar_asientos(lineas: list) -> tuple[list, bool]:
+	"""No parte un asiento. Si el primero no cabe, lo devuelve entero y marcado."""
+	if len(lineas) <= _MAX_FILAS:
+		return lineas, False
+	corte = (lineas[_MAX_FILAS].voucher_type, lineas[_MAX_FILAS].voucher_no)
+	completas = [row for row in lineas[:_MAX_FILAS] if (row.voucher_type, row.voucher_no) != corte]
+	if completas:
+		return completas, True
+	primero = (lineas[0].voucher_type, lineas[0].voucher_no)
+	return [row for row in lineas if (row.voucher_type, row.voucher_no) == primero], True
+
+
+@frappe.whitelist()
+def libro_diario(company: str, from_date: str, to_date: str) -> dict:
+	"""Libro Diario (Código de Comercio arts. 25-28).
+
+	Un asiento es un comprobante validado. El número es correlativo en el
+	ejercicio, por fecha de contabilización, y se calcula al consultar.
+	"""
+	company = _compania(company)
+	if not frappe.has_permission("GL Entry", "read"):
+		frappe.throw(_("No tiene permiso para ver el libro diario"), frappe.PermissionError)
+	inicio, fin = _fechas(from_date, to_date)
+	ejercicio, fy_start, _fy_end = _ejercicio_unico(company, inicio, fin)
+	finance_book = frappe.get_cached_value("Company", company, "default_finance_book") or ""
+	numeracion = _numeracion_asientos(company, fy_start, fin, finance_book)
+
+	GL = frappe.qb.DocType("GL Entry")
+	Account = frappe.qb.DocType("Account")
+	condiciones = _condicion_gl(GL, company, inicio, fin, finance_book)
+	total_lineas = (
+		frappe.qb.from_(GL).select(Count("*").as_("filas")).where(condiciones).run(as_dict=True)
+	)[0].filas
+	consulta = (
+		frappe.qb.from_(GL)
+		.join(Account)
+		.on(Account.name == GL.account)
+		.select(
+			GL.name,
+			GL.posting_date,
+			GL.account,
+			GL.debit,
+			GL.credit,
+			GL.voucher_type,
+			GL.voucher_no,
+			GL.remarks,
+			Account.account_number,
+			Account.account_name,
+		)
+		.where(condiciones)
+		.orderby(GL.posting_date)
+		.orderby(GL.creation)
+		.orderby(GL.name)
+		.limit(_MAX_FILAS + 1)
+		.run(as_dict=True)
+	)
+	lineas, truncated = _recortar_asientos(consulta)
+	truncated = truncated or int(total_lineas or 0) > len(lineas)
+
+	grupos: dict[tuple, list] = {}
+	orden = []
+	for row in lineas:
+		clave = (row.voucher_type, row.voucher_no)
+		if clave not in grupos:
+			grupos[clave] = []
+			orden.append(clave)
+		grupos[clave].append(row)
+
+	conceptos = _conceptos_asiento(orden)
+	entries = []
+	total_debe = 0.0
+	total_haber = 0.0
+	for clave in orden:
+		meta = numeracion.get(clave)
+		if not meta:
+			continue
+		lineas_asiento = sorted(
+			grupos[clave],
+			key=lambda row: (
+				0 if _numero(row.debit) else 1,
+				row.account_number or "",
+				row.account_name or "",
+				row.name,
+			),
+		)
+		concepto = conceptos.get(clave) or next(
+			(row.remarks.strip() for row in lineas_asiento if (row.remarks or "").strip()),
+			"",
+		)
+		lines = []
+		debe = haber = 0.0
+		for row in lineas_asiento:
+			importe_debe = _numero(row.debit)
+			importe_haber = _numero(row.credit)
+			debe += importe_debe
+			haber += importe_haber
+			lines.append(
+				{
+					"name": row.name,
+					"account": row.account,
+					"account_number": row.account_number or "",
+					"account_name": row.account_name or row.account,
+					"concepto": ((row.remarks or "").strip() or concepto),
+					"debit": importe_debe,
+					"credit": importe_haber,
+				}
+			)
+		total_debe += debe
+		total_haber += haber
+		entries.append(
+			{
+				"numero": meta["numero"],
+				"posting_date": str(lineas_asiento[0].posting_date),
+				"voucher_type": clave[0],
+				"voucher_no": clave[1],
+				"clase": _clase_asiento(clave[0], meta.get("is_opening")),
+				"concepto": concepto,
+				"debit": debe,
+				"credit": haber,
+				"lines": lines,
+			}
+		)
+	entries.sort(key=lambda entry: entry["numero"])
+	en_periodo = sum(
+		1 for meta in numeracion.values() if getdate(meta["posting_date"]) >= inicio
+	)
+	return {
+		"company": company,
+		"currency": _moneda(company),
+		"from_date": str(inicio),
+		"to_date": str(fin),
+		"fiscal_year": ejercicio,
+		"fiscal_year_start": str(fy_start),
+		"entries": entries,
+		"totals": {
+			"debe": total_debe,
+			"haber": total_haber,
+			"asientos": en_periodo,
+			"asientos_mostrados": len(entries),
+			"filas": len(lineas),
+		},
+		"cuadrado": abs(total_debe - total_haber) < 0.005,
+		"truncated": truncated,
 	}
 
 

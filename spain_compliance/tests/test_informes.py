@@ -9,6 +9,7 @@ from frappe.utils import getdate, nowdate
 
 from spain_compliance.api.informes import (
 	ajustes,
+	libro_diario,
 	libro_iva,
 	libro_mayor,
 	liquidacion_iva,
@@ -217,9 +218,98 @@ class TestInformes(FrappeTestCase):
 		self.assertEqual(tipos["prorrata_general"], "Percent")
 		self.assertEqual(tipos["pgc_espanol"], "Check")
 
+	def _cuentas_balance(self):
+		rows = frappe.db.sql(
+			"""
+			SELECT name
+			FROM `tabAccount`
+			WHERE company = %s AND is_group = 0
+			  AND IFNULL(account_type, '') NOT IN (
+			    'Receivable', 'Payable', 'Stock', 'Tax', 'Chargeable'
+			  )
+			  AND root_type IN ('Asset', 'Liability', 'Equity')
+			ORDER BY lft
+			LIMIT 2
+			""",
+			COMPANY,
+			as_dict=True,
+		)
+		self.assertGreaterEqual(len(rows), 2, "hacen falta dos cuentas de balance")
+		return rows[0].name, rows[1].name
+
+	def _asiento(self, debito, credito, amount, posting_date, remark, voucher_type="Journal Entry"):
+		cost_center = frappe.db.get_value("Company", COMPANY, "cost_center")
+		doc = frappe.get_doc(
+			{
+				"doctype": "Journal Entry",
+				"voucher_type": voucher_type,
+				"company": COMPANY,
+				"posting_date": posting_date,
+				"user_remark": remark,
+				"accounts": [
+					{
+						"account": debito,
+						"debit_in_account_currency": amount,
+						"cost_center": cost_center,
+					},
+					{
+						"account": credito,
+						"credit_in_account_currency": amount,
+						"cost_center": cost_center,
+					},
+				],
+			}
+		)
+		doc.insert()
+		doc.submit()
+		return doc
+
+	def test_libro_diario_numera_por_ejercicio(self):
+		from erpnext.accounts.utils import get_fiscal_year
+
+		debito, credito = self._cuentas_balance()
+		_nombre, fy_inicio, fy_fin = get_fiscal_year(nowdate(), company=COMPANY, verbose=0)
+		early = getdate(fy_inicio)
+		late = min(getdate(nowdate()), getdate(fy_fin))
+		apertura = self._asiento(
+			debito, credito, 80, early, "Apertura SC", voucher_type="Opening Entry"
+		)
+		ordinario = self._asiento(debito, credito, 25, late, "Diario SC")
+
+		libro = libro_diario(COMPANY, str(early), str(late))
+		primero = next(row for row in libro["entries"] if row["voucher_no"] == apertura.name)
+		segundo = next(row for row in libro["entries"] if row["voucher_no"] == ordinario.name)
+		self.assertEqual(primero["clase"], "Apertura")
+		self.assertEqual(segundo["clase"], "Diario")
+		self.assertLess(primero["numero"], segundo["numero"])
+		self.assertEqual(primero["concepto"], "Apertura SC")
+		self.assertEqual(primero["debit"], 80)
+		self.assertEqual(primero["credit"], 80)
+		self.assertEqual(len(primero["lines"]), 2)
+		self.assertEqual(primero["lines"][0]["debit"], 80)
+		self.assertEqual(primero["lines"][1]["credit"], 80)
+		self.assertTrue(primero["lines"][0]["account_name"])
+		self.assertEqual(libro["fiscal_year"], _nombre)
+		self.assertTrue(libro["cuadrado"])
+
+		if late > early:
+			solo = libro_diario(COMPANY, str(late), str(late))
+			visible = next(row for row in solo["entries"] if row["voucher_no"] == ordinario.name)
+			self.assertEqual(visible["numero"], segundo["numero"])
+			self.assertFalse(any(row["voucher_no"] == apertura.name for row in solo["entries"]))
+
+		apertura.cancel()
+		despues = libro_diario(COMPANY, str(early), str(late))
+		self.assertFalse(any(row["voucher_no"] == apertura.name for row in despues["entries"]))
+		renumerado = next(row for row in despues["entries"] if row["voucher_no"] == ordinario.name)
+		self.assertEqual(renumerado["numero"], segundo["numero"] - 1)
+
 	def test_invitado_no_entra(self):
 		frappe.set_user("Guest")
 		try:
 			self.assertRaises(frappe.PermissionError, ajustes, COMPANY)
+			self.assertRaises(
+				frappe.PermissionError, libro_diario, COMPANY, "2026-01-01", "2026-01-31"
+			)
 		finally:
 			frappe.set_user("Administrator")

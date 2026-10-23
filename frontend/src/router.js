@@ -352,6 +352,11 @@ const routes = [
 
   // Informes (Books)
   {
+    path: '/journal-book',
+    name: 'JournalBook',
+    component: () => import('@/pages/LibroDiario.vue'),
+  },
+  {
     path: '/general-ledger',
     name: 'GeneralLedger',
     component: () => import('@/pages/GeneralLedger.vue'),

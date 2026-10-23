@@ -37,7 +37,7 @@ On submit of a sales or purchase invoice, a Spanish company (country Spain, or w
 Two extra values on the native `Sales Invoice.status` field (no custom column), with buttons on the invoice form and preserved across ERPNext's automatic status recalculation while the invoice is outstanding. Optionally, invoices overdue by *N* months (Company → **Meses hasta Dudoso Cobro**) are moved to *Dudoso Cobro* by a daily job. Disabled (0) by default.
 
 ### Contabilidad UI
-A [frappe-ui](https://github.com/frappe/frappe-ui) single-page app at `/contabilidad` (Apps screen → *Contabilidad*): dashboard with billing, cash-flow and receivables, and list views for invoices, payments, journal entries, parties, items and tax templates built on ERPNext DocTypes. Compliance sections (SII, Verifactu, tax forms) are placeholders for upcoming work.
+A [frappe-ui](https://github.com/frappe/frappe-ui) single-page app at `/contabilidad` (Apps screen → *Contabilidad*): dashboard with billing, cash-flow and receivables, and list views for invoices, payments, journal entries, parties, items and tax templates built on ERPNext DocTypes. Reports in the same app: libro diario (entry numbers for the fiscal year), libro mayor, pérdidas y ganancias, balance, sumas y saldos, libro de IVA and liquidación de IVA. SII and Verifactu remain placeholders.
 
 ## Compatibility
 

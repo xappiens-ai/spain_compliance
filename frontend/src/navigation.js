@@ -9,6 +9,7 @@ import LucidePackage from '~icons/lucide/package'
 import LucideShoppingCart from '~icons/lucide/shopping-cart'
 import LucideTruck from '~icons/lucide/truck'
 import LucideBookOpen from '~icons/lucide/book-open'
+import LucideScrollText from '~icons/lucide/scroll-text'
 import LucideLayers from '~icons/lucide/layers'
 import LucideTrendingUp from '~icons/lucide/trending-up'
 import LucideScale from '~icons/lucide/scale'
@@ -124,6 +125,11 @@ export const navigation = [
     label: 'Informes',
     collapsible: true,
     items: [
+      {
+        name: 'JournalBook',
+        label: 'Libro diario',
+        icon: markRaw(LucideScrollText),
+      },
       {
         name: 'GeneralLedger',
         label: 'Libro mayor',
