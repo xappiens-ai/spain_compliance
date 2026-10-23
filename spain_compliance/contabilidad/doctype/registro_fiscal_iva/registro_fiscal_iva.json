@@ -1,0 +1,350 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-10-23 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "company",
+  "libro",
+  "anulado",
+  "sin_clasificar",
+  "column_break_estado",
+  "fecha",
+  "ejercicio",
+  "periodo_trimestre",
+  "periodo_mes",
+  "section_factura",
+  "voucher_type",
+  "voucher_no",
+  "serie",
+  "numero",
+  "numero_externo",
+  "tipo_factura",
+  "factura_rectificada",
+  "total_factura",
+  "column_break_tercero",
+  "party_type",
+  "party",
+  "party_name",
+  "tipo_identificacion",
+  "nif",
+  "pais",
+  "section_impuesto",
+  "tipo_impuesto",
+  "clave_iva",
+  "deducible_iva",
+  "clave_retencion",
+  "column_break_importes",
+  "base_imponible",
+  "tipo_impositivo",
+  "cuota",
+  "cuota_deducible",
+  "section_fechas",
+  "fecha_expedicion",
+  "fecha_operacion",
+  "tax_row",
+  "currency"
+ ],
+ "fields": [
+  {
+   "default": "RF-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Serie",
+   "no_copy": 1,
+   "options": "RF-.YYYY.-",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Compañía",
+   "options": "Company",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "libro",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Libro",
+   "options": "Expedidas\nRecibidas",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "anulado",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Anulado",
+   "search_index": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sin_clasificar",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Pendiente de clasificar"
+  },
+  {
+   "fieldname": "column_break_estado",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "fecha",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Fecha de contabilización",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ejercicio",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Ejercicio",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "periodo_trimestre",
+   "fieldtype": "Select",
+   "label": "Trimestre",
+   "options": "1T\n2T\n3T\n4T",
+   "reqd": 1
+  },
+  {
+   "fieldname": "periodo_mes",
+   "fieldtype": "Data",
+   "label": "Mes"
+  },
+  {
+   "fieldname": "section_factura",
+   "fieldtype": "Section Break",
+   "label": "Factura"
+  },
+  {
+   "fieldname": "voucher_type",
+   "fieldtype": "Link",
+   "label": "Tipo de documento",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "voucher_no",
+   "fieldtype": "Dynamic Link",
+   "in_standard_filter": 1,
+   "label": "Documento",
+   "options": "voucher_type",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "serie",
+   "fieldtype": "Data",
+   "label": "Serie"
+  },
+  {
+   "fieldname": "numero",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Número"
+  },
+  {
+   "fieldname": "numero_externo",
+   "fieldtype": "Data",
+   "label": "Número de factura del proveedor"
+  },
+  {
+   "fieldname": "tipo_factura",
+   "fieldtype": "Data",
+   "label": "Tipo de factura"
+  },
+  {
+   "fieldname": "factura_rectificada",
+   "fieldtype": "Data",
+   "label": "Factura rectificada"
+  },
+  {
+   "fieldname": "total_factura",
+   "fieldtype": "Currency",
+   "label": "Total factura",
+   "options": "currency"
+  },
+  {
+   "fieldname": "column_break_tercero",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "party_type",
+   "fieldtype": "Link",
+   "label": "Tipo de tercero",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "party",
+   "fieldtype": "Dynamic Link",
+   "label": "Tercero",
+   "options": "party_type"
+  },
+  {
+   "fieldname": "party_name",
+   "fieldtype": "Data",
+   "label": "Nombre del tercero"
+  },
+  {
+   "fieldname": "tipo_identificacion",
+   "fieldtype": "Data",
+   "label": "Tipo de identificación"
+  },
+  {
+   "fieldname": "nif",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "NIF"
+  },
+  {
+   "fieldname": "pais",
+   "fieldtype": "Data",
+   "label": "País"
+  },
+  {
+   "fieldname": "section_impuesto",
+   "fieldtype": "Section Break",
+   "label": "Impuesto"
+  },
+  {
+   "fieldname": "tipo_impuesto",
+   "fieldtype": "Data",
+   "label": "Tipo de impuesto"
+  },
+  {
+   "fieldname": "clave_iva",
+   "fieldtype": "Data",
+   "label": "Clave de IVA"
+  },
+  {
+   "fieldname": "deducible_iva",
+   "fieldtype": "Data",
+   "label": "Deducibilidad"
+  },
+  {
+   "fieldname": "clave_retencion",
+   "fieldtype": "Data",
+   "label": "Clave de retención"
+  },
+  {
+   "fieldname": "column_break_importes",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "base_imponible",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Base imponible",
+   "options": "currency"
+  },
+  {
+   "fieldname": "tipo_impositivo",
+   "fieldtype": "Float",
+   "label": "Tipo impositivo",
+   "precision": "3"
+  },
+  {
+   "fieldname": "cuota",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Cuota",
+   "options": "currency"
+  },
+  {
+   "fieldname": "cuota_deducible",
+   "fieldtype": "Currency",
+   "label": "Cuota deducible",
+   "options": "currency"
+  },
+  {
+   "fieldname": "section_fechas",
+   "fieldtype": "Section Break",
+   "collapsible": 1,
+   "label": "Fechas y origen"
+  },
+  {
+   "fieldname": "fecha_expedicion",
+   "fieldtype": "Date",
+   "label": "Fecha de expedición"
+  },
+  {
+   "fieldname": "fecha_operacion",
+   "fieldtype": "Date",
+   "label": "Fecha de operación"
+  },
+  {
+   "fieldname": "tax_row",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Fila de impuesto",
+   "read_only": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Moneda",
+   "options": "Currency"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-23 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Contabilidad",
+ "name": "Registro Fiscal IVA",
+ "naming_rule": "By naming series",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "search_fields": "company,numero,nif,voucher_no",
+ "sort_field": "fecha",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "numero",
+ "track_changes": 1
+}

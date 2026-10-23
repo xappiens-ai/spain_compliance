@@ -13,6 +13,17 @@ from __future__ import annotations
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields, delete_custom_fields
 
+from spain_compliance.contabilidad.clasificacion import (
+	CLAVE_IVA_OPTIONS,
+	CLAVE_RETENCION_OPTIONS,
+	DEDUCIBLE_OPTIONS,
+	MODELO_CUENTAS_OPTIONS,
+	PERIODICIDAD_303_OPTIONS,
+	REGIMEN_IVA_OPTIONS,
+	TIPO_IDENTIFICACION_OPTIONS,
+	TIPO_IMPUESTO_OPTIONS,
+)
+
 # Company -----------------------------------------------------------------
 COMPANY_PGC_FIELDNAME = "pgc_espanol"
 COMPANY_RETURN_SERIES_FIELDNAME = "serie_rectificativas"
@@ -30,6 +41,12 @@ DEFAULT_CUSTOMER_PREFIX = "4300"
 DEFAULT_SUPPLIER_PREFIX = "4000"
 DEFAULT_ACCOUNT_DIGITS = 8
 
+COMPANY_PRORRATA_FIELDNAME = "prorrata_general"
+COMPANY_EXIGIR_CLASIFICACION_FIELDNAME = "exigir_clasificacion_fiscal"
+
+# Copiados de la plantilla a la fila de la factura cuando esta va vacía.
+TAX_CLASSIFICATION_FIELDS = ("tipo_impuesto", "clave_iva", "deducible_iva", "clave_retencion")
+
 DEFAULT_RETURN_SERIES = "{company_abbr}.R.YY.{#####}"
 
 # Created by an early draft of this app. ERPNext already exposes
@@ -38,6 +55,69 @@ DEFAULT_RETURN_SERIES = "{company_abbr}.R.YY.{#####}"
 LEGACY_FIELDS: dict[str, list[str]] = {
 	"Sales Invoice": ["company_abbr"],
 }
+
+
+def _clasificacion_impuesto(insert_after: str) -> list[dict]:
+	return [
+		{
+			"fieldname": "clasificacion_fiscal_section",
+			"label": "Clasificación fiscal (España)",
+			"fieldtype": "Section Break",
+			"insert_after": insert_after,
+			"collapsible": 1,
+		},
+		{
+			"fieldname": "tipo_impuesto",
+			"label": "Tipo de impuesto",
+			"fieldtype": "Select",
+			"options": TIPO_IMPUESTO_OPTIONS,
+			"insert_after": "clasificacion_fiscal_section",
+			"in_list_view": 1,
+			"description": "IVA, recargo de equivalencia o retención. Vacío = pendiente de clasificar.",
+		},
+		{
+			"fieldname": "clave_iva",
+			"label": "Clave de IVA",
+			"fieldtype": "Select",
+			"options": CLAVE_IVA_OPTIONS,
+			"insert_after": "tipo_impuesto",
+			"in_list_view": 1,
+			"description": "Calificación de la operación para el libro registro y el modelo 303.",
+		},
+		{
+			"fieldname": "deducible_iva",
+			"label": "Deducibilidad",
+			"fieldtype": "Select",
+			"options": DEDUCIBLE_OPTIONS,
+			"insert_after": "clave_iva",
+			"description": "Solo compras. Corriente aplica la prorrata de la compañía; un bien de inversión se deduce entero.",
+		},
+		{
+			"fieldname": "clave_retencion",
+			"label": "Clave de retención",
+			"fieldtype": "Select",
+			"options": CLAVE_RETENCION_OPTIONS,
+			"insert_after": "deducible_iva",
+			"description": "Clave del perceptor para los modelos 111, 115, 190 y 180.",
+		},
+	]
+
+
+def _identificacion_tercero() -> list[dict]:
+	return [
+		{
+			"fieldname": "tipo_identificacion_fiscal",
+			"label": "Tipo de identificación fiscal",
+			"fieldtype": "Select",
+			"options": TIPO_IDENTIFICACION_OPTIONS,
+			"insert_after": "tax_id",
+			"description": (
+				"NIF, NIE o CIF españoles y NIF-IVA se comprueban al guardar. Si no cuadra, se avisa "
+				"y el tercero se guarda igual."
+			),
+		},
+	]
+
 
 CUSTOM_FIELDS: dict[str, list[dict]] = {
 	"Company": [
@@ -166,7 +246,114 @@ CUSTOM_FIELDS: dict[str, list[dict]] = {
 			"mandatory_depends_on": f"eval:doc.{COMPANY_SUPPLIER_AUTO_FIELDNAME}",
 			"description": "Longitud total del número de cuenta (prefijo incluido).",
 		},
+		{
+			"fieldname": "fiscalidad_section",
+			"label": "Fiscalidad",
+			"fieldtype": "Section Break",
+			"insert_after": COMPANY_SUPPLIER_DIGITS_FIELDNAME,
+			"collapsible": 1,
+		},
+		{
+			"fieldname": "regimen_iva",
+			"label": "Régimen de IVA",
+			"fieldtype": "Select",
+			"options": REGIMEN_IVA_OPTIONS,
+			"insert_after": "fiscalidad_section",
+			"default": "General",
+			"description": "Se usará en el modelo 303. El registro de IVA ya distingue las claves de cada factura.",
+		},
+		{
+			"fieldname": "periodicidad_modelo_303",
+			"label": "Periodicidad del modelo 303",
+			"fieldtype": "Select",
+			"options": PERIODICIDAD_303_OPTIONS,
+			"insert_after": "regimen_iva",
+			"default": "Trimestral",
+		},
+		{
+			"fieldname": "modelo_cuentas_anuales",
+			"label": "Modelo de cuentas anuales",
+			"fieldtype": "Select",
+			"options": MODELO_CUENTAS_OPTIONS,
+			"insert_after": "periodicidad_modelo_303",
+			"default": "PYMES",
+		},
+		{
+			"fieldname": "epigrafe_iae",
+			"label": "Epígrafe IAE",
+			"fieldtype": "Data",
+			"insert_after": "modelo_cuentas_anuales",
+			"description": "Código de actividad para los libros registro de IVA.",
+		},
+		{
+			"fieldname": "fiscalidad_column",
+			"fieldtype": "Column Break",
+			"insert_after": "epigrafe_iae",
+		},
+		{
+			"fieldname": COMPANY_PRORRATA_FIELDNAME,
+			"label": "Prorrata general (%)",
+			"fieldtype": "Percent",
+			"insert_after": "fiscalidad_column",
+			"default": "100",
+			"description": (
+				"Porcentaje de IVA soportado corriente que se considera deducible al generar el "
+				"registro. 100 es deducción completa."
+			),
+		},
+		{
+			"fieldname": "prorrata_especial",
+			"label": "Prorrata especial",
+			"fieldtype": "Check",
+			"insert_after": COMPANY_PRORRATA_FIELDNAME,
+			"default": "0",
+			"description": (
+				"La prorrata especial se calcula por operación. Hasta que cada factura lo indique, "
+				"el registro aplica la prorrata general."
+			),
+		},
+		{
+			"fieldname": COMPANY_EXIGIR_CLASIFICACION_FIELDNAME,
+			"label": "Exigir clasificación fiscal",
+			"fieldtype": "Check",
+			"insert_after": "prorrata_especial",
+			"default": "0",
+			"description": (
+				"Impide validar facturas con impuestos sin tipo, clave o, en compras, deducibilidad. "
+				"Desactivado: la factura se valida y el registro queda pendiente de clasificar."
+			),
+		},
+		{
+			"fieldname": "contacto_aeat",
+			"label": "Persona de contacto AEAT",
+			"fieldtype": "Data",
+			"insert_after": COMPANY_EXIGIR_CLASIFICACION_FIELDNAME,
+		},
+		{
+			"fieldname": "telefono_aeat",
+			"label": "Teléfono de contacto AEAT",
+			"fieldtype": "Data",
+			"insert_after": "contacto_aeat",
+		},
 	],
+	"Sales Taxes and Charges": _clasificacion_impuesto("base_net_amount"),
+	"Purchase Taxes and Charges": _clasificacion_impuesto("base_net_amount"),
+	"Item Tax Template": [
+		{
+			"fieldname": "clave_iva",
+			"label": "Clave de IVA",
+			"fieldtype": "Select",
+			"options": CLAVE_IVA_OPTIONS,
+			"insert_after": "disabled",
+			"description": (
+				"Si se informa, sustituye a la clave de la fila de impuesto en los artículos que usen "
+				"esta plantilla. Sirve para mezclar en una factura operaciones con distinta clave "
+				"(por ejemplo, sujeta y exenta)."
+			),
+		},
+	],
+	"Customer": _identificacion_tercero(),
+	"Supplier": _identificacion_tercero(),
 }
 
 

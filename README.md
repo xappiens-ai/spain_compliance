@@ -29,6 +29,10 @@ Spanish invoicing rules require rectifying invoices to use their own series. ERP
 
 `{company_abbr}` resolves to the Company abbreviation when the invoice is named, so you can also use it in the ordinary series (e.g. `{company_abbr}.F.YY.{#####}`). It is not a stored field: ERPNext already uses that name internally.
 
+### VAT breakdown (`Registro Fiscal IVA`)
+
+On submit of a sales or purchase invoice, a Spanish company (country Spain, or with the PGC tree enabled) gets one row per operation key and tax rate: base, rate, quota and, on purchases, the deductible quota after the company pro-rata. Cancelling the invoice marks the rows as void. Tax rows are classified on the tax template (type, VAT key, deductibility, withholding key); invoices copy that classification when their own row is empty. Unclassified taxes do not block posting unless the company asks for it. Details: [docs/registro-fiscal.md](docs/registro-fiscal.md).
+
 ### Collection statuses: *Dudoso Cobro* and *Pérdida*
 Two extra values on the native `Sales Invoice.status` field (no custom column), with buttons on the invoice form and preserved across ERPNext's automatic status recalculation while the invoice is outstanding. Optionally, invoices overdue by *N* months (Company → **Meses hasta Dudoso Cobro**) are moved to *Dudoso Cobro* by a daily job. Disabled (0) by default.
 
@@ -66,6 +70,8 @@ Everything is configured per **Company**, section *Contabilidad España*:
 | Plan General Contable (árbol de 9 grupos) | Enable per-account `root_type` and the PGC-aware financial statements. Set automatically by the conversion button. |
 | Serie de facturas rectificativas | Naming series forced on credit notes. Empty = ERPNext default behaviour. |
 | Meses hasta Dudoso Cobro | Months after due date before an unpaid invoice becomes *Dudoso Cobro*. 0 = off. |
+| Régimen de IVA / Periodicidad del 303 / Prorrata / Modelo de cuentas anuales | Used by the VAT register and, later, by the tax forms. |
+| Exigir clasificación fiscal | Block invoices whose taxes are not classified. Off by default: the invoice posts and the VAT row is flagged as pending. |
 | Crear cuenta contable al dar de alta clientes / proveedores | Per-party ledger accounts (PGC companies only). Off by default. |
 | Prefijo / Dígitos de las cuentas | Account number prefix (`4300`, `4000`, `4100`…) and total length (8). |
 
@@ -76,6 +82,7 @@ Access to `/contabilidad` is granted to *Accounts User*, *Accounts Manager* and 
 - [docs/correlatividad-facturas.md](docs/correlatividad-facturas.md) — correlatividad serie + fecha y Auto Repeat
 - [docs/series-facturas-abono.md](docs/series-facturas-abono.md) — series de facturas y rectificativas
 - [docs/cuentas-tercero.md](docs/cuentas-tercero.md) — cuentas 430/400 automáticas por cliente y proveedor
+- [docs/registro-fiscal.md](docs/registro-fiscal.md) — desglose de IVA al validar la factura
 - [docs/desarrollo.md](docs/desarrollo.md) — arquitectura y directrices de desarrollo
 - [docs/publicacion.md](docs/publicacion.md) — cómo se mantiene y publica la app (GitLab canónico, GitHub público)
 

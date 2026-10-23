@@ -4,7 +4,7 @@ app_publisher = "Xappiens"
 app_description = (
 	"Contabilidad española para ERPNext: Plan General Contable, correlatividad de "
 	"facturas, series de facturas rectificativas, estados de cobro "
-	"(dudoso cobro / pérdida) e interfaz de contabilidad."
+	"(dudoso cobro / pérdida), registro fiscal de IVA e interfaz de contabilidad."
 )
 app_email = "hello@xappiens.com"
 app_license = "mit"
@@ -49,13 +49,25 @@ override_doctype_class = {
 doc_events = {
 	# PGC: cuenta auxiliar 430xxxxx / 400xxxxx por tercero (opción en Company)
 	"Company": {"validate": "spain_compliance.contabilidad.cuentas_tercero.validate_company"},
-	"Customer": {"after_insert": "spain_compliance.contabilidad.cuentas_tercero.on_party_insert"},
-	"Supplier": {"after_insert": "spain_compliance.contabilidad.cuentas_tercero.on_party_insert"},
+	"Customer": {
+		"after_insert": "spain_compliance.contabilidad.cuentas_tercero.on_party_insert",
+		"validate": "spain_compliance.contabilidad.identificacion.validate_party",
+	},
+	"Supplier": {
+		"after_insert": "spain_compliance.contabilidad.cuentas_tercero.on_party_insert",
+		"validate": "spain_compliance.contabilidad.identificacion.validate_party",
+	},
 	"Sales Invoice": {
-		"before_validate": "spain_compliance.contabilidad.cuentas_tercero.on_invoice_before_validate"
+		"before_validate": "spain_compliance.contabilidad.cuentas_tercero.on_invoice_before_validate",
+		"validate": "spain_compliance.contabilidad.registro_fiscal.validar_factura",
+		"on_submit": "spain_compliance.contabilidad.registro_fiscal.on_submit",
+		"on_cancel": "spain_compliance.contabilidad.registro_fiscal.on_cancel",
 	},
 	"Purchase Invoice": {
-		"before_validate": "spain_compliance.contabilidad.cuentas_tercero.on_invoice_before_validate"
+		"before_validate": "spain_compliance.contabilidad.cuentas_tercero.on_invoice_before_validate",
+		"validate": "spain_compliance.contabilidad.registro_fiscal.validar_factura",
+		"on_submit": "spain_compliance.contabilidad.registro_fiscal.on_submit",
+		"on_cancel": "spain_compliance.contabilidad.registro_fiscal.on_cancel",
 	},
 }
 

@@ -45,13 +45,14 @@ ERPNext Desk
   Sales Invoice  ← override (correlatividad, serie rectificativa, Dudoso Cobro / Pérdida) + public/js/sales_invoice.js
   Account        ← override (root_type propio en compañías PGC)
   Company        ← Custom Fields + public/js/company.js (conversión PGC, cuentas de tercero pendientes)
-  Customer / Supplier / facturas ← doc_events: subcuenta 430/400 por tercero (cuentas_tercero.py)
+  Customer / Supplier ← doc_events: subcuenta 430/400 (cuentas_tercero.py); aviso de NIF (identificacion.py)
+  Sales / Purchase Invoice ← doc_events: Registro Fiscal IVA al validar, anulado al cancelar
   Informes financieros ← monkey_patches.py (Balance / PyG con árbol PGC)
 ```
 
 | Capa | Dónde | Rol |
 |------|--------|-----|
-| Python Frappe | `spain_compliance/` | hooks, overrides, `www`, APIs, permisos, futuros DocTypes propios |
+| Python Frappe | `spain_compliance/` | hooks, overrides, `www`, APIs, permisos, DocTypes propios |
 | SPA | `frontend/` | UI. Todo lo visual vive aquí |
 | ERPNext | app requerida | Diario, cuentas, compañías, etc. No duplicar esos DocTypes |
 
@@ -69,6 +70,10 @@ ERPNext Desk
 | `overrides/account.py` | `root_type` propio por cuenta en compañías PGC |
 | `contabilidad/plan_contable.py` | Grupos/subgrupos PGC, `reestructurar_arbol`, API `convertir_plan_a_pgc` |
 | `contabilidad/cuentas_tercero.py` | Subcuenta por cliente/proveedor con secuencia PGC; backfill `crear_cuentas_pendientes` ([cuentas-tercero.md](cuentas-tercero.md)) |
+| `contabilidad/clasificacion.py` | Códigos de IVA, retención e identificación que se guardan en los Select |
+| `contabilidad/identificacion.py` | Validación de NIF/NIE/CIF/NIF-IVA (aviso, no bloqueo) |
+| `contabilidad/registro_fiscal.py` | Desglose al validar; `reconstruir_registro_fiscal` ([registro-fiscal.md](registro-fiscal.md)) |
+| `contabilidad/doctype/registro_fiscal_iva/` | DocType `Registro Fiscal IVA` |
 | `monkey_patches.py` | Parches de `erpnext.accounts.report.financial_statements` para el árbol PGC |
 | `tasks.py` | Tarea diaria `auto_mark_dudoso_cobro` (por Company, `meses_dudoso_cobro`) |
 | `www/contabilidad.py` | Contexto SPA: Guest → login, `has_app_permission`, `get_boot` |
@@ -195,6 +200,6 @@ yarn build  # producción → public/frontend + www/contabilidad.html
 ## Hoja de ruta (pendiente de decidir)
 
 - Plantilla de plan de cuentas PGC completa (con `account_number` y `root_type` por cuenta) para compañías nuevas.
-- Modelos de Hacienda (303, 390, 347, 349, 111, 115, 190…), SII, Verifactu.
+- Libros registro y modelos de Hacienda (303, 390, 347, 349, 111, 115, 190…) sobre `Registro Fiscal IVA`. SII y Verifactu, aparte.
 - Formulario de asiento y árbol de cuentas en la SPA.
 - Rama `version-16`.
