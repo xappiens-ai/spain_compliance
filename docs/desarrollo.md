@@ -198,9 +198,18 @@ yarn build  # producción → public/frontend + www/contabilidad.html
 - No mezclar cambios de Frappe 16 en esta rama.
 - Sin secretos, sin dumps, sin configuración de sitios concretos en el repo.
 
-## Hoja de ruta (pendiente de decidir)
+## Alcance y hoja de ruta
 
-- Plantilla de plan de cuentas PGC completa (con `account_number` y `root_type` por cuenta) para compañías nuevas.
-- Libros registro y modelos de Hacienda (303, 390, 347, 349, 111, 115, 190…) sobre `Registro Fiscal IVA`. SII y Verifactu, aparte.
+Antes de implementar algo “porque el cliente lo pide”, leer:
+
+- [alcance.md](alcance.md) — qué es ERPNext, qué es esta app, qué es Non Profit, qué no tocar (p. ej. no duplicar partida doble ni Budget).
+- [esfl.md](esfl.md) — PGC-ESFL, socios, certificados de donación, Modelo 182.
+- Plan detallado de fases (interno): `/home/frappe/docs/spain-compliance-plan-desarrollo.md`.
+
+Pendiente de producto (resumen):
+
+- Plantilla de plan de cuentas PGC completa (con `account_number` y `root_type` por cuenta) para compañías nuevas; variante **ESFL** (RD 1491/2011) después o bajo demanda.
+- Libros registro y modelos de Hacienda (303, 390, 347, 349, 111, 115, 190, **182**…) sobre registros fiscales. SII y Verifactu, aparte.
+- SPA: no confundir Quotation (“Presupuestos” de venta) con el DocType **Budget** contable; exponer Budget / Cost Center / Project cuando se pida analítica.
 - Formulario de asiento y árbol de cuentas en la SPA.
 - Rama `version-16`.

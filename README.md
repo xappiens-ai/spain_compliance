@@ -79,6 +79,8 @@ Access to `/contabilidad` is granted to *Accounts User*, *Accounts Manager* and 
 
 ## Documentation (Spanish)
 
+- [docs/alcance.md](docs/alcance.md) — qué cubre ERPNext, Spain Compliance, Non Profit y qué queda fuera (PGC, partida doble, socios, presupuestos, proyectos)
+- [docs/esfl.md](docs/esfl.md) — ESFL (RD 1491/2011), cuotas, certificados de donación y Modelo 182 (spec de implementación)
 - [docs/correlatividad-facturas.md](docs/correlatividad-facturas.md) — correlatividad serie + fecha y Auto Repeat
 - [docs/series-facturas-abono.md](docs/series-facturas-abono.md) — series de facturas y rectificativas
 - [docs/cuentas-tercero.md](docs/cuentas-tercero.md) — cuentas 430/400 automáticas por cliente y proveedor
