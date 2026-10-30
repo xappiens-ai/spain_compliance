@@ -413,17 +413,26 @@ def crear_cuentas_pendientes_desde_company(company: str, party_type: str = "Cust
 
 
 def _backfill_job(company: str, party_type: str, user: str):
+	"""Background job: create pending party accounts, then notify the requester.
+
+	Do not call ``frappe.db.commit()`` here. RQ's ``execute_job`` commits on
+	success; a manual commit would split the transaction and trips the
+	marketplace ``frappe-manual-commit`` check. The realtime toast runs on
+	``after_commit`` so it only fires once the worker has persisted the work.
+	"""
 	resultado = crear_cuentas_pendientes(company, party_type, solo_con_movimientos=1, dry_run=0)
-	frappe.db.commit()
-	frappe.publish_realtime(
-		"msgprint",
-		{
-			"message": _("Cuentas creadas: {0} · Errores: {1} (ver Error Log).").format(
-				len(resultado["creadas"]), len(resultado["errores"])
-			),
-			"indicator": "orange" if resultado["errores"] else "green",
-			"title": _("Cuentas de terceros · {0}").format(company),
-		},
-		user=user,
-	)
+	n_creadas = len(resultado["creadas"])
+	n_errores = len(resultado["errores"])
+	mensaje = _("Cuentas creadas: {0} · Errores: {1} (ver Error Log).").format(n_creadas, n_errores)
+	titulo = _("Cuentas de terceros · {0}").format(company)
+	indicator = "orange" if n_errores else "green"
+
+	def _avisar():
+		frappe.publish_realtime(
+			"msgprint",
+			{"message": mensaje, "indicator": indicator, "title": titulo},
+			user=user,
+		)
+
+	frappe.db.after_commit.add(_avisar)
 	return resultado

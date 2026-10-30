@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Xappiens and contributors
 # License: MIT
 
+from unittest.mock import patch
+
 import frappe
 from erpnext.accounts.party import get_party_account
 from frappe.tests.utils import FrappeTestCase
@@ -376,3 +378,19 @@ class TestCuentasTercero(FrappeTestCase):
 		self._configurar(cliente=0)
 		with self.assertRaises(ConfigError):
 			cuentas_tercero.crear_cuentas_pendientes(COMPANY, "Customer")
+
+	def test_backfill_job_defers_notify_without_manual_commit(self):
+		"""RQ commits the job; the toast must wait on after_commit, not db.commit()."""
+		self._configurar(cliente=0)
+		con_mov = _customer("_Test SC Backfill Job")
+		_sales_invoice(con_mov.name)
+		self._configurar(cliente=1)
+
+		pending_before = len(frappe.db.after_commit._functions)
+		with patch.object(frappe.db, "commit") as mock_commit:
+			resultado = cuentas_tercero._backfill_job(COMPANY, "Customer", frappe.session.user)
+			mock_commit.assert_not_called()
+
+		self.assertFalse(resultado["errores"])
+		self.assertIsNotNone(cuentas_tercero.cuenta_de_tercero("Customer", con_mov.name, COMPANY))
+		self.assertGreater(len(frappe.db.after_commit._functions), pending_before)
