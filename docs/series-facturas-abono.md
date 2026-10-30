@@ -20,7 +20,7 @@ En España la factura rectificativa (abono) debe emitirse en una **serie propia*
 
 `make_sales_return` de ERPNext **copia** la `naming_series` de la factura original a la rectificativa. Con la serie configurada en la Company:
 
-- **Servidor** (`spain_compliance.overrides.sales_invoice.SalesInvoice.before_naming`): si `is_return` y la serie actual está vacía, es la copiada de la factura rectificada (`return_against`) o es la serie ordinaria por defecto → se sustituye por la serie rectificativa **antes de asignar nombre**.
+- **Servidor** (`doc_events` → `spain_compliance.overrides.sales_invoice.on_before_naming`): si `is_return` y la serie actual está vacía, es la copiada de la factura rectificada (`return_against`) o es la serie ordinaria por defecto → se sustituye por la serie rectificativa **antes de asignar nombre**.
 - **Formulario** (`public/js/sales_invoice.js`): mismo criterio al marcar *Is Return* o cambiar la compañía.
 
 Si el usuario elige a mano otra serie distinta (p. ej. una serie rectificativa de un ejercicio anterior, `{company_abbr}.R.25.{#####}`), se respeta.

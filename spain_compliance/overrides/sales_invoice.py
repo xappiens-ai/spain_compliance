@@ -12,15 +12,17 @@
    series are moved to it before naming.
 3. Correlatividad de serie y fecha (RD 1619/2012): no fechas futuras al guardar
    (el número se reserva entonces) y orden cronológico dentro de la serie.
+
+On Frappe v16+ the status logic is wired via ``extend_doctype_class``
+(``SalesInvoiceMixin``). On v15 (no extend API) the same method is applied by
+``monkey_patches``. Naming series and correlatividad use ``doc_events`` on both.
 """
 
 from __future__ import annotations
 
 import frappe
-from erpnext.accounts.doctype.sales_invoice.sales_invoice import (
-	SalesInvoice as ERPNextSalesInvoice,
-)
 from frappe import _
+from frappe.model.document import Document
 from frappe.utils import flt
 
 from spain_compliance.contabilidad.correlatividad import validate_sales_invoice_correlatividad
@@ -54,76 +56,93 @@ def get_default_naming_series() -> str | None:
 	return options[0] if options else None
 
 
-class SalesInvoice(ERPNextSalesInvoice):
-	def before_naming(self):
-		# ERPNext's SalesInvoice defines no before_naming; frappe.model.naming calls this hook.
-		self._ensure_company_abbr()
-		self._apply_return_naming_series()
+def ensure_company_abbr(doc) -> None:
+	"""Put the company abbreviation where naming series can read it.
 
-	def validate(self):
-		super().validate()
-		validate_sales_invoice_correlatividad(self)
+	``{company_abbr}`` in a series is resolved with ``doc.get()``, which only
+	sees values stored on the document. ERPNext already has ``company_abbr``
+	as a property on the accounts controller, so this must not be a Custom
+	Field: Frappe rejects that name. Setting it here is enough for naming
+	and is not persisted.
+	"""
+	if not doc.company or doc.get("company_abbr"):
+		return
+	abbr = frappe.get_cached_value("Company", doc.company, "abbr")
+	if abbr:
+		doc.set("company_abbr", abbr)
 
-	# Naming series for credit notes ----------------------------------------
 
-	def _ensure_company_abbr(self):
-		"""Put the company abbreviation where naming series can read it.
+def apply_return_naming_series(doc) -> None:
+	if not doc.is_return:
+		return
+	target = get_return_naming_series(doc.company)
+	if not target:
+		return
 
-		``{company_abbr}`` in a series is resolved with ``doc.get()``, which only
-		sees values stored on the document. ERPNext already has ``company_abbr``
-		as a property on the accounts controller, so this must not be a Custom
-		Field: Frappe rejects that name. Setting it here is enough for naming
-		and is not persisted.
-		"""
-		if not self.company or self.get("company_abbr"):
-			return
-		abbr = frappe.get_cached_value("Company", self.company, "abbr")
-		if abbr:
-			self.set("company_abbr", abbr)
+	current = (doc.naming_series or "").strip()
+	if current == target:
+		return
 
-	def _apply_return_naming_series(self):
-		if not self.is_return:
-			return
-		target = get_return_naming_series(self.company)
-		if not target:
-			return
+	# Only override series that were clearly not chosen for a credit note:
+	# empty, copied from the invoice being rectified, or the ordinary default.
+	copied_from_original = None
+	if doc.return_against:
+		copied_from_original = frappe.db.get_value("Sales Invoice", doc.return_against, "naming_series")
 
-		current = (self.naming_series or "").strip()
-		if current == target:
-			return
+	if not current or current == copied_from_original or current == get_default_naming_series():
+		doc.naming_series = target
 
-		# Only override series that were clearly not chosen for a credit note:
-		# empty, copied from the invoice being rectified, or the ordinary default.
-		copied_from_original = None
-		if self.return_against:
-			copied_from_original = frappe.db.get_value("Sales Invoice", self.return_against, "naming_series")
 
-		if not current or current == copied_from_original or current == get_default_naming_series():
-			self.naming_series = target
+def on_before_naming(doc, method=None):
+	"""doc_events: credit-note series + company_abbr before the name is assigned."""
+	ensure_company_abbr(doc)
+	apply_return_naming_series(doc)
 
-	# Collection status -------------------------------------------------------
+
+def on_validate_correlatividad(doc, method=None):
+	"""doc_events: correlatividad after ERPNext's own validate."""
+	validate_sales_invoice_correlatividad(doc)
+
+
+def set_status_with_loss_preservation(doc, call_original, update=False, status=None, update_modified=True):
+	"""Preserve ``Dudoso Cobro`` / ``Pérdida`` across ERPNext status recalculation.
+
+	``call_original`` must invoke the upstream ``set_status`` (bound or lambda)
+	with ``update=False`` semantics handled here.
+	"""
+	if status in LOSS_STATUSES:
+		doc.status = status
+		if update:
+			doc.db_set("status", doc.status, update_modified=update_modified)
+		return
+
+	preserve = doc.get("status") if doc.get("status") in LOSS_STATUSES else None
+
+	call_original(update=False, status=None, update_modified=update_modified)
+
+	if (
+		preserve
+		and doc.docstatus == 1
+		and flt(doc.outstanding_amount) > 0.01
+		and doc.status not in FINAL_STATUSES
+	):
+		doc.status = preserve
+
+	if update:
+		doc.db_set("status", doc.status, update_modified=update_modified)
+
+
+class SalesInvoiceMixin(Document):
+	"""Frappe v16+ ``extend_doctype_class`` extension for collection statuses."""
 
 	def set_status(self, update=False, status=None, update_modified=True):
-		if status in LOSS_STATUSES:
-			self.status = status
-			if update:
-				self.db_set("status", self.status, update_modified=update_modified)
-			return
-
-		preserve = self.get("status") if self.get("status") in LOSS_STATUSES else None
-
-		super().set_status(update=False, status=None, update_modified=update_modified)
-
-		if (
-			preserve
-			and self.docstatus == 1
-			and flt(self.outstanding_amount) > 0.01
-			and self.status not in FINAL_STATUSES
-		):
-			self.status = preserve
-
-		if update:
-			self.db_set("status", self.status, update_modified=update_modified)
+		set_status_with_loss_preservation(
+			self,
+			lambda **kwargs: super(SalesInvoiceMixin, self).set_status(**kwargs),
+			update=update,
+			status=status,
+			update_modified=update_modified,
+		)
 
 
 @frappe.whitelist()

@@ -1,32 +1,44 @@
 # Copyright (c) 2026, Xappiens and contributors
 # License: MIT
 
-"""Parches para que Balance / PyG funcionen con el árbol PGC de 9 grupos.
+"""Runtime patches applied when the app loads.
 
-Los informes financieros de ERPNext asumen que todas las cuentas de un
-``root_type`` cuelgan de raíces con ese mismo ``root_type``:
+1. Financial statements (Balance / P&L) for the PGC 9-group account tree.
+2. On Frappe v15 only: Sales Invoice ``set_status`` and Account
+   ``set_root_and_report_type`` (v16+ uses ``extend_doctype_class`` instead).
 
-1. ``get_data`` recorre las raíces del root_type y trae el GL solo de las
-   cuentas dentro de esos subárboles (lft/rgt). Con el PGC, una cuenta de
-   activo (430) puede colgar del grupo 4 (pasivo nominal) y se quedaría fuera.
-2. ``filter_accounts`` descarta cuentas cuyo padre no está en la lista
-   filtrada por root_type (ramas mixtas desaparecerían del informe).
+Financial statements assume every account of a ``root_type`` hangs under roots
+with that same ``root_type``:
 
-Para compañías PGC (``Company.pgc_espanol``):
+1. ``get_data`` walks roots of the root_type and loads GL only for accounts in
+   those subtrees (lft/rgt). Under PGC, an asset account (430) may hang under
+   group 4 (nominal liability) and would be skipped.
+2. ``filter_accounts`` drops accounts whose parent is not in the root_type
+   filter (mixed branches disappear from the report).
 
-- ``set_gl_entries_by_account``: una sola pasada por root_type + compañía,
-  sin restricción lft/rgt (deduplicada con una clave centinela).
-- ``get_accounts``: añade los grupos ancestros como esqueleto para que la
-  jerarquía se muestre completa; los totales solo suman las cuentas del
-  root_type correspondiente.
+For PGC companies (``Company.pgc_espanol``):
 
-En compañías no PGC el comportamiento es exactamente el nativo.
+- ``set_gl_entries_by_account``: one pass per root_type + company, without
+  lft/rgt restriction (deduped with a sentinel key).
+- ``get_accounts``: adds ancestor groups as skeleton so the hierarchy renders;
+  totals still sum only accounts of the matching root_type.
+
+Non-PGC companies keep native behaviour.
 """
 
 from __future__ import annotations
 
 
-def aplicar():
+def _frappe_supports_extend_doctype_class() -> bool:
+	"""``extend_doctype_class`` exists in Frappe v16+ (``_get_extended_class``)."""
+	try:
+		from frappe.model import document as document_module
+	except ImportError:
+		return False
+	return hasattr(document_module, "_get_extended_class")
+
+
+def aplicar_informes_pgc():
 	try:
 		import frappe
 		from erpnext.accounts.report import financial_statements as fs
@@ -94,8 +106,8 @@ def aplicar():
 			and isinstance(gl_entries_by_account, dict)
 			and _es_pgc(company)
 		):
-			# get_data llama una vez por raíz del root_type; con PGC basta una
-			# pasada por compañía + root_type sin restricción de subárbol.
+			# get_data calls once per root of the root_type; under PGC one pass
+			# per company + root_type without subtree restriction is enough.
 			centinela = f"__pgc_{root_type}__"
 			if centinela in gl_entries_by_account:
 				return
@@ -130,3 +142,54 @@ def aplicar():
 
 	fs.get_accounts = get_accounts
 	fs.set_gl_entries_by_account = set_gl_entries_by_account
+
+
+def aplicar_doctype_extensions():
+	"""On Frappe v15, patch methods that need class-level interception.
+
+	Frappe v16+ applies the same logic via ``extend_doctype_class`` (mixins in
+	``spain_compliance.overrides``). Patching the ERPNext classes here would
+	double-wrap ``super()`` calls from those mixins, so we skip when extend is
+	available.
+	"""
+	if _frappe_supports_extend_doctype_class():
+		return
+
+	try:
+		from erpnext.accounts.doctype.account.account import Account
+		from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
+	except ImportError:
+		return
+
+	if not getattr(SalesInvoice.set_status, "_spain_compliance", False):
+		from spain_compliance.overrides.sales_invoice import set_status_with_loss_preservation
+
+		_original_set_status = SalesInvoice.set_status
+
+		def set_status(self, update=False, status=None, update_modified=True):
+			set_status_with_loss_preservation(
+				self,
+				lambda **kwargs: _original_set_status(self, **kwargs),
+				update=update,
+				status=status,
+				update_modified=update_modified,
+			)
+
+		set_status._spain_compliance = True
+		SalesInvoice.set_status = set_status
+
+	if not getattr(Account.set_root_and_report_type, "_spain_compliance", False):
+		from spain_compliance.overrides.account import set_root_and_report_type_pgc
+
+		_original_set_root = Account.set_root_and_report_type
+
+		def set_root_and_report_type(self):
+			set_root_and_report_type_pgc(self, lambda: _original_set_root(self))
+
+		set_root_and_report_type._spain_compliance = True
+		Account.set_root_and_report_type = set_root_and_report_type
+
+
+def aplicar():
+	aplicar_informes_pgc()
+	aplicar_doctype_extensions()

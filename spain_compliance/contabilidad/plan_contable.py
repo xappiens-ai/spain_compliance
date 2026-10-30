@@ -17,7 +17,7 @@ Este módulo:
 - Elimina (o desactiva y recoloca, si tienen enlaces) las cuentas y raíces
   heredadas del plan estándar de ERPNext.
 
-Junto con el override de Account (``spain_compliance.overrides.account``) y los
+Junto con la extensión de Account (``spain_compliance.overrides.account``) y los
 parches de ``spain_compliance.monkey_patches``, cada cuenta conserva su propio
 ``root_type`` aunque cuelgue de un grupo con otro tipo, y Balance / PyG siguen
 cuadrando.

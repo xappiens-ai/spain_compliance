@@ -153,7 +153,7 @@ Un único **`ListViewBuilder`** sobre las primitivas `ListView`, `ListHeader`, `
 - APIs whitelistadas en `spain_compliance/api/` o junto al dominio (`contabilidad/`, `overrides/`). Siempre con comprobación de permisos explícita.
 - DocTypes propios solo cuando ERPNext no cubra el concepto (SII, Verifactu, modelos Hacienda). Diario y cuentas: DocTypes ERPNext.
 - CSRF en `get_boot`: solo si existe `frappe.local.session_obj`.
-- Los overrides de clase (`override_doctype_class`) son exclusivos por DocType en Frappe: si otra app también sobrescribe `Sales Invoice` o `Account`, documentarlo en el README.
+- Extensiones de DocType vía `extend_doctype_class` (Frappe v16+) y `doc_events`; en v15 los métodos que no admiten eventos (`set_status`, `set_root_and_report_type`) se aplican en `monkey_patches`. No usar `override_doctype_class`.
 - Tras cambiar Python, hooks o traducciones:
 
 ```bash

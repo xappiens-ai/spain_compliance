@@ -37,13 +37,16 @@ after_install = "spain_compliance.install.after_install"
 after_migrate = "spain_compliance.install.after_migrate"
 before_uninstall = "spain_compliance.install.before_uninstall"
 
-# DocType overrides -------------------------------------------------------------
+# DocType extensions ------------------------------------------------------------
+# Prefer extend_doctype_class (Frappe v16+) over override_doctype_class so other
+# apps can extend the same DocTypes. On Frappe v15 the framework ignores this
+# hook; monkey_patches.aplicar_doctype_extensions() patches the same methods.
 
-override_doctype_class = {
-	# Credit-note naming series + correlatividad + collection statuses
-	"Sales Invoice": "spain_compliance.overrides.sales_invoice.SalesInvoice",
+extend_doctype_class = {
+	# Preserve Dudoso Cobro / Pérdida across ERPNext status recalculation
+	"Sales Invoice": "spain_compliance.overrides.sales_invoice.SalesInvoiceMixin",
 	# PGC: each account keeps its own root_type inside the 9-group tree
-	"Account": "spain_compliance.overrides.account.SpainAccount",
+	"Account": "spain_compliance.overrides.account.AccountMixin",
 }
 
 doc_events = {
@@ -58,8 +61,12 @@ doc_events = {
 		"validate": "spain_compliance.contabilidad.identificacion.validate_party",
 	},
 	"Sales Invoice": {
+		"before_naming": "spain_compliance.overrides.sales_invoice.on_before_naming",
 		"before_validate": "spain_compliance.contabilidad.cuentas_tercero.on_invoice_before_validate",
-		"validate": "spain_compliance.contabilidad.registro_fiscal.validar_factura",
+		"validate": [
+			"spain_compliance.contabilidad.registro_fiscal.validar_factura",
+			"spain_compliance.overrides.sales_invoice.on_validate_correlatividad",
+		],
 		"before_submit": "spain_compliance.contabilidad.registro_fiscal.before_submit",
 		"on_submit": "spain_compliance.contabilidad.registro_fiscal.on_submit",
 		"on_cancel": "spain_compliance.contabilidad.registro_fiscal.on_cancel",
