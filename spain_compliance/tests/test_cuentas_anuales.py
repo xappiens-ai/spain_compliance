@@ -3,13 +3,13 @@
 
 """Estructura PGC del balance y la PyG y clasificación de cuentas por prefijo."""
 
-from frappe.tests import UnitTestCase
+from unittest import TestCase
 
 from spain_compliance.contabilidad import cuentas_anuales as ca
 from spain_compliance.contabilidad.pgc import CUADRO, normalizar_numero
 
 
-class TestEstructura(UnitTestCase):
+class TestEstructura(TestCase):
 	def test_todo_destino_es_partida_hoja(self):
 		hojas_balance = set(ca.HOJAS_BALANCE)
 		for prefijo, destino in ca._REGLAS_BALANCE.items():
@@ -33,7 +33,7 @@ class TestEstructura(UnitTestCase):
 		self.assertEqual({codigo for codigo in CUADRO if len(codigo) == 1}, set("123456789"))
 
 
-class TestClasificacion(UnitTestCase):
+class TestClasificacion(TestCase):
 	def test_balance_por_prefijo_mas_largo(self):
 		casos = {
 			"4300000161": "B.III.1",
@@ -100,7 +100,7 @@ class TestClasificacion(UnitTestCase):
 		self.assertEqual(normalizar_numero("430.0001"), "4300001")
 
 
-class TestPresentacion(UnitTestCase):
+class TestPresentacion(TestCase):
 	def _periodo(self, importes: dict[str, float]):
 		periodo = ca.Periodo()
 		for code, importe in importes.items():

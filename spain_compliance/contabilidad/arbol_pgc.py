@@ -316,10 +316,8 @@ def _aplicar(company: str, plan: dict, abbr: str):
 			continue
 		_crear_grupo(company, numero, mapa)
 
-	for indice, item in enumerate(plan["renombrar"], start=1):
+	for item in plan["renombrar"]:
 		_renombrar(company, item, abbr)
-		if indice % 50 == 0:
-			frappe.db.commit()
 
 	# Los nombres ya son los definitivos: se recalcula el padre y se mueve.
 	filas = _filas(company)
@@ -330,7 +328,6 @@ def _aplicar(company: str, plan: dict, abbr: str):
 		)
 
 	mapa = _mapa_grupos(company)
-	movidos = 0
 	for item in pendiente["recolocar"]:
 		padre = item["parent_number"]
 		parent_name = mapa.get(padre) if padre else None
@@ -340,15 +337,11 @@ def _aplicar(company: str, plan: dict, abbr: str):
 			frappe.db.set_value("Account", item["name"], "parent_account", parent_name, update_modified=False)
 		else:
 			frappe.db.sql("update `tabAccount` set parent_account=null where name=%s", item["name"])
-		movidos += 1
-		if movidos % 400 == 0:
-			frappe.db.commit()
 
 	if pendiente["recolocar"] or plan["crear"] or plan["promover"]:
 		from frappe.utils.nestedset import rebuild_tree
 
 		rebuild_tree("Account")
-	frappe.db.commit()
 	frappe.clear_cache(doctype="Account")
 
 

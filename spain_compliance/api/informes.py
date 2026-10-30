@@ -924,7 +924,6 @@ def libro_mayor(
 
 
 def _saldos_mayor(company, inicio, fin, fy_inicio, finance_book, alcance) -> dict[str, dict]:
-	condicion = ""
 	params = {
 		"company": company,
 		"inicio": inicio,
@@ -935,10 +934,8 @@ def _saldos_mayor(company, inicio, fin, fy_inicio, finance_book, alcance) -> dic
 	if alcance is not None:
 		if not alcance:
 			return {}
-		condicion = "AND g.account IN %(alcance)s"
-		params["alcance"] = tuple(alcance)
 	filas = frappe.db.sql(
-		f"""
+		"""
 		SELECT g.account, a.account_number, a.root_type,
 			IF(g.posting_date < %(inicio)s, 1, 0) AS previo,
 			IF(g.posting_date < %(fy_inicio)s, 1, 0) AS antes_ejercicio,
@@ -946,10 +943,15 @@ def _saldos_mayor(company, inicio, fin, fy_inicio, finance_book, alcance) -> dic
 		FROM `tabGL Entry` g
 		INNER JOIN `tabAccount` a ON a.name = g.account
 		WHERE g.company = %(company)s AND g.posting_date <= %(fin)s AND g.is_cancelled = 0
-			AND (g.finance_book IS NULL OR g.finance_book IN ('', %(finance_book)s)) {condicion}
+			AND (g.finance_book IS NULL OR g.finance_book IN ('', %(finance_book)s))
+			AND (%(con_acotacion)s = 0 OR g.account IN %(alcance)s)
 		GROUP BY g.account, previo, antes_ejercicio
 		""",
-		params,
+		{
+			**params,
+			"alcance": tuple(alcance or ("",)),
+			"con_acotacion": int(alcance is not None),
+		},
 		as_dict=True,
 	)
 	saldos: dict[str, dict] = {}

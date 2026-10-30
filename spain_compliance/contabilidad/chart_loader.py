@@ -63,7 +63,11 @@ def _clear_company_account_defaults(company: str):
 	meta = frappe.get_meta("Company")
 	updates = {}
 	for df in meta.fields:
-		if df.fieldtype == "Link" and df.options == "Account" and getattr(frappe.get_doc("Company", company), df.fieldname, None):
+		if (
+			df.fieldtype == "Link"
+			and df.options == "Account"
+			and getattr(frappe.get_doc("Company", company), df.fieldname, None)
+		):
 			updates[df.fieldname] = None
 	if updates:
 		frappe.db.set_value("Company", company, updates)
@@ -78,7 +82,7 @@ def _delete_company_gl(company: str):
 
 def _delete_company_accounts(company: str):
 	"""Borra todas las cuentas de la compañía (hojas primero)."""
-	for _ in range(12):
+	for _attempt in range(12):
 		cuentas = frappe.get_all(
 			"Account",
 			filters={"company": company},
@@ -100,6 +104,10 @@ def _delete_company_accounts(company: str):
 		if not avance:
 			frappe.db.sql("delete from `tabAccount` where company=%s", company)
 			return
+	else:
+		frappe.throw(
+			_("No se han podido eliminar todas las cuentas de {0} tras 12 intentos.").format(company)
+		)
 
 
 @frappe.whitelist()
@@ -145,17 +153,22 @@ def _reemplazar_plan_por_pgc_job(company: str, wipe_gl: int, user: str):
 		)
 		raise
 
-	frappe.publish_realtime(
-		"msgprint",
-		{
-			"message": _(
-				"Plan PGC cargado en {0}. Cuentas: {1}. GL borrado: {2}."
-			).format(company, resumen.get("accounts"), resumen.get("wipe_gl")),
-			"indicator": "green",
-			"title": _("Plan General Contable"),
-		},
-		user=user,
-	)
+	def _avisar_exito():
+		frappe.publish_realtime(
+			"msgprint",
+			{
+				"message": _("Plan PGC cargado en {0}. Cuentas: {1}. GL borrado: {2}.").format(
+					company, resumen.get("accounts"), resumen.get("wipe_gl")
+				),
+				"indicator": "green",
+				"title": _("Plan General Contable"),
+			},
+			user=user,
+		)
+
+	# The RQ worker commits successful jobs. Notify only after that commit,
+	# rather than splitting the account import into partial transactions.
+	frappe.db.after_commit.add(_avisar_exito)
 
 
 def sembrar_pgc(company: str, wipe_gl: bool = True) -> dict:
@@ -169,13 +182,10 @@ def sembrar_pgc(company: str, wipe_gl: bool = True) -> dict:
 
 	_clear_company_account_defaults(company)
 	_delete_company_accounts(company)
-	frappe.db.commit()
-
 	frappe.local.flags.ignore_chart_of_accounts = False
 	create_charts(company, custom_chart=load_pgc_chart())
 	activar_pgc(company)
 	frappe.db.set_value("Company", company, "chart_of_accounts", CHART_NAME)
-	frappe.db.commit()
 
 	n = frappe.db.count("Account", {"company": company})
 	return {"company": company, "accounts": n, "wipe_gl": wipe_gl, "chart": CHART_NAME}

@@ -5,8 +5,7 @@
 
 import json
 from pathlib import Path
-
-from frappe.tests import UnitTestCase
+from unittest import TestCase
 
 from spain_compliance.contabilidad.arbol_pgc import (
 	auditar_plantilla,
@@ -20,7 +19,7 @@ from spain_compliance.contabilidad.pgc import CUADRO
 _PLANTILLA = Path(__file__).resolve().parents[1] / "contabilidad" / "charts" / "es_pgce_con_numeros.json"
 
 
-class TestPadreCanonico(UnitTestCase):
+class TestPadreCanonico(TestCase):
 	def test_auxiliar_no_cuelga_del_relleno_de_ceros(self):
 		grupos = {"4", "43", "430", "4300", "4301"}
 		self.assertTrue(es_codigo_relleno("4300", grupos))
@@ -44,7 +43,7 @@ class TestPadreCanonico(UnitTestCase):
 		self.assertEqual(padre_canonico("43", {"4", "43"}), "4")
 
 
-class TestPlan(UnitTestCase):
+class TestPlan(TestCase):
 	def test_recoloca_el_auxiliar_y_renombra_el_grupo(self):
 		filas = [
 			_fila("4", "4", CUADRO["4"], padre=""),
@@ -77,7 +76,7 @@ class TestPlan(UnitTestCase):
 		self.assertEqual(plan["recolocar"], [])
 
 
-class TestPlantilla(UnitTestCase):
+class TestPlantilla(TestCase):
 	def test_reubica_por_numero_y_usa_el_nombre_oficial(self):
 		data = {
 			"country_code": "es",

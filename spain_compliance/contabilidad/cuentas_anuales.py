@@ -738,14 +738,6 @@ class Periodo:
 		return sum(self.lineas.get(code, {}).values())
 
 
-def _condicion_libro(company: str) -> tuple[str, dict]:
-	finance_book = frappe.get_cached_value("Company", company, "default_finance_book") or ""
-	return (
-		"(g.finance_book IS NULL OR g.finance_book IN ('', %(finance_book)s))",
-		{"finance_book": finance_book},
-	)
-
-
 def ejercicio(company: str, fecha) -> tuple[str, object, object]:
 	from erpnext.accounts.utils import get_fiscal_year
 
@@ -781,19 +773,25 @@ def calcular_balance(company: str, fecha) -> Periodo:
 		_nombre, fy_inicio, _fy_fin = ejercicio(company, fecha)
 	except frappe.ValidationError:
 		fy_inicio = fecha.replace(month=1, day=1)
-	condicion, params = _condicion_libro(company)
+	finance_book = frappe.get_cached_value("Company", company, "default_finance_book") or ""
 	filas = frappe.db.sql(
-		f"""
+		"""
 		SELECT g.account, a.account_number, a.account_name, a.root_type, a.account_type,
 			IF(g.posting_date < %(fy_inicio)s, 1, 0) AS previo,
 			SUM(g.debit) AS debe, SUM(g.credit) AS haber
 		FROM `tabGL Entry` g
 		INNER JOIN `tabAccount` a ON a.name = g.account
 		WHERE g.company = %(company)s AND g.posting_date <= %(fecha)s
-			AND g.is_cancelled = 0 AND {condicion}
+			AND g.is_cancelled = 0
+			AND (g.finance_book IS NULL OR g.finance_book IN ('', %(finance_book)s))
 		GROUP BY g.account, previo
 		""",
-		{"company": company, "fecha": fecha, "fy_inicio": fy_inicio, **params},
+		{
+			"company": company,
+			"fecha": fecha,
+			"fy_inicio": fy_inicio,
+			"finance_book": finance_book,
+		},
 		as_dict=True,
 	)
 
@@ -859,21 +857,27 @@ def calcular_pyg(company: str, desde, hasta) -> tuple[Periodo, dict[str, dict[st
 
 	Devuelve el periodo y, por mes (AAAA-MM), los importes de cada partida hoja.
 	"""
-	condicion, params = _condicion_libro(company)
+	finance_book = frappe.get_cached_value("Company", company, "default_finance_book") or ""
 	filas = frappe.db.sql(
-		f"""
+		"""
 		SELECT g.account, a.account_number, a.account_name, a.root_type, a.account_type,
 			DATE_FORMAT(g.posting_date, '%%Y-%%m') AS mes,
 			SUM(g.debit) AS debe, SUM(g.credit) AS haber
 		FROM `tabGL Entry` g
 		INNER JOIN `tabAccount` a ON a.name = g.account
 		WHERE g.company = %(company)s AND g.posting_date BETWEEN %(desde)s AND %(hasta)s
-			AND g.is_cancelled = 0 AND g.voucher_type != 'Period Closing Voucher' AND {condicion}
+			AND g.is_cancelled = 0 AND g.voucher_type != 'Period Closing Voucher'
+			AND (g.finance_book IS NULL OR g.finance_book IN ('', %(finance_book)s))
 			AND (a.root_type IN ('Income', 'Expense') OR a.account_number LIKE '6%%'
 				OR a.account_number LIKE '7%%')
 		GROUP BY g.account, mes
 		""",
-		{"company": company, "desde": getdate(desde), "hasta": getdate(hasta), **params},
+		{
+			"company": company,
+			"desde": getdate(desde),
+			"hasta": getdate(hasta),
+			"finance_book": finance_book,
+		},
 		as_dict=True,
 	)
 	periodo = Periodo()
@@ -1107,9 +1111,9 @@ def calcular_sumas_y_saldos(company: str, desde, hasta, fy_inicio) -> dict:
 	arrastran de ejercicios sin cerrar se muestra en una fila calculada del subgrupo 12.
 	"""
 	desde, hasta, fy_inicio = getdate(desde), getdate(hasta), getdate(fy_inicio)
-	condicion, params = _condicion_libro(company)
+	finance_book = frappe.get_cached_value("Company", company, "default_finance_book") or ""
 	filas = frappe.db.sql(
-		f"""
+		"""
 		SELECT g.account, a.account_number, a.account_name, a.root_type, a.account_type,
 			IF(g.posting_date < %(desde)s, 1, 0) AS previo,
 			IF(g.posting_date < %(fy_inicio)s, 1, 0) AS antes_ejercicio,
@@ -1117,10 +1121,17 @@ def calcular_sumas_y_saldos(company: str, desde, hasta, fy_inicio) -> dict:
 		FROM `tabGL Entry` g
 		INNER JOIN `tabAccount` a ON a.name = g.account
 		WHERE g.company = %(company)s AND g.posting_date <= %(hasta)s
-			AND g.is_cancelled = 0 AND {condicion}
+			AND g.is_cancelled = 0
+			AND (g.finance_book IS NULL OR g.finance_book IN ('', %(finance_book)s))
 		GROUP BY g.account, previo, antes_ejercicio
 		""",
-		{"company": company, "desde": desde, "hasta": hasta, "fy_inicio": fy_inicio, **params},
+		{
+			"company": company,
+			"desde": desde,
+			"hasta": hasta,
+			"fy_inicio": fy_inicio,
+			"finance_book": finance_book,
+		},
 		as_dict=True,
 	)
 
