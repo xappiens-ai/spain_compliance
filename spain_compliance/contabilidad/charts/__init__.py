@@ -1,0 +1,2 @@
+# Copyright (c) 2026, Xappiens and contributors
+# License: MIT

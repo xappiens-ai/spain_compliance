@@ -1,0 +1,18 @@
+{
+  "private": true,
+  "name": "spain_compliance",
+  "description": "Spanish accounting and compliance for ERPNext",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xappiens-ai/spain_compliance.git"
+  },
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "postinstall": "cd frontend && yarn install --check-files",
+    "dev": "cd frontend && yarn dev",
+    "build": "cd frontend && yarn build"
+  }
+}
