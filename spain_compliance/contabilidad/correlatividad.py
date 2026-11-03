@@ -9,16 +9,27 @@ orden cronológico: un número mayor no puede llevar fecha de expedición anteri
 a un número menor de la misma serie.
 
 ERPNext asigna el nombre (número) al guardar el borrador, no al validar. Por
-eso la comprobación corre en cada ``validate`` una vez existe nombre: impedir
-reservar un número con fecha futura o romper el orden frente a facturas ya
-existentes (borrador, validadas o canceladas).
+eso la comprobación corre en cada ``before_validate`` / ``validate`` una vez
+existe nombre: impedir reservar un número con fecha futura o romper el orden
+frente a facturas ya existentes (borrador, validadas o canceladas).
+
+La identidad de serie se deduce del **nombre** del documento (prefijo del
+contador en ``tabSeries``), no del texto de ``naming_series``. Dos plantillas
+distintas que resuelven al mismo contador (p. ej. ``{company_abbr}.F.YY.#####``
+y ``XAP.F.YY.#####``) son la misma serie legal y deben validarse juntas.
+``before_validate`` se ejecuta aunque el llamador pase ``ignore_validate``.
 """
 
 from __future__ import annotations
 
+import re
+
 import frappe
 from frappe import _
 from frappe.utils import getdate, today
+
+_HASH_RUN = re.compile(r"#+")
+_AMEND_SUFFIX = re.compile(r"^(.+)-(\d+)$")
 
 
 def validate_sales_invoice_correlatividad(doc, method=None):
@@ -29,9 +40,39 @@ def validate_sales_invoice_correlatividad(doc, method=None):
 		return
 	if not doc.get("posting_date"):
 		return
+	if not doc.company:
+		return
 
 	_validate_posting_date_not_future(doc)
 	_validate_series_chronology(doc)
+
+
+def get_counter_digits(naming_series: str | None) -> int:
+	"""Width of the numeric counter in the naming series (default 5)."""
+	matches = _HASH_RUN.findall(naming_series or "")
+	if matches:
+		return len(matches[-1])
+	return 5
+
+
+def series_prefix_from_name(name: str | None, digits: int) -> str | None:
+	"""Return the Series counter prefix for an invoice name.
+
+	``XAPF2600060`` + 5 → ``XAPF26``; amended ``XAPF2600016-1`` → ``XAPF26``.
+	"""
+	if not name or name.startswith("new-"):
+		return None
+
+	base = name
+	amend = _AMEND_SUFFIX.fullmatch(name)
+	if amend:
+		candidate = amend.group(1)
+		if len(candidate) >= digits and candidate[-digits:].isdigit():
+			base = candidate
+
+	if len(base) < digits or not base[-digits:].isdigit():
+		return None
+	return base[:-digits]
 
 
 def _validate_posting_date_not_future(doc):
@@ -53,28 +94,28 @@ def _validate_posting_date_not_future(doc):
 
 
 def _validate_series_chronology(doc):
-	"""Dentro de la misma compañía y naming_series, name↑ ⇒ posting_date↑."""
-	naming_series = (doc.get("naming_series") or "").strip()
-	if not naming_series or not doc.company:
+	"""Dentro de la misma compañía y serie (prefijo del nombre), name↑ ⇒ posting_date↑."""
+	digits = get_counter_digits(doc.get("naming_series"))
+	prefix = series_prefix_from_name(doc.name, digits)
+	if not prefix:
 		return
 
 	posting = getdate(doc.posting_date)
+	peers = _peers_in_series(doc.company, doc.name, prefix, digits)
+	if not peers:
+		return
 
-	prev = frappe.db.sql(
-		"""
-		SELECT name, posting_date
-		FROM `tabSales Invoice`
-		WHERE company = %s
-			AND naming_series = %s
-			AND name < %s
-			AND posting_date > %s
-		ORDER BY name DESC
-		LIMIT 1
-		""",
-		(doc.company, naming_series, doc.name, posting),
-		as_dict=True,
-	)
-	if prev:
+	prev = None
+	nxt = None
+	for peer in peers:
+		if peer.name < doc.name:
+			if prev is None or peer.name > prev.name:
+				prev = peer
+		elif peer.name > doc.name:
+			if nxt is None or peer.name < nxt.name:
+				nxt = peer
+
+	if prev and getdate(prev.posting_date) > posting:
 		frappe.throw(
 			_(
 				"La factura {0} (fecha {1}) rompe la correlatividad de la serie: "
@@ -84,27 +125,13 @@ def _validate_series_chronology(doc):
 			).format(
 				frappe.bold(doc.name),
 				frappe.bold(str(posting)),
-				frappe.bold(prev[0].name),
-				frappe.bold(str(getdate(prev[0].posting_date))),
+				frappe.bold(prev.name),
+				frappe.bold(str(getdate(prev.posting_date))),
 			),
 			title=_("Correlatividad de facturas"),
 		)
 
-	nxt = frappe.db.sql(
-		"""
-		SELECT name, posting_date
-		FROM `tabSales Invoice`
-		WHERE company = %s
-			AND naming_series = %s
-			AND name > %s
-			AND posting_date < %s
-		ORDER BY name ASC
-		LIMIT 1
-		""",
-		(doc.company, naming_series, doc.name, posting),
-		as_dict=True,
-	)
-	if nxt:
+	if nxt and getdate(nxt.posting_date) < posting:
 		frappe.throw(
 			_(
 				"La factura {0} (fecha {1}) rompe la correlatividad de la serie: "
@@ -114,8 +141,27 @@ def _validate_series_chronology(doc):
 			).format(
 				frappe.bold(doc.name),
 				frappe.bold(str(posting)),
-				frappe.bold(nxt[0].name),
-				frappe.bold(str(getdate(nxt[0].posting_date))),
+				frappe.bold(nxt.name),
+				frappe.bold(str(getdate(nxt.posting_date))),
 			),
 			title=_("Correlatividad de facturas"),
 		)
+
+
+def _peers_in_series(company: str, name: str, prefix: str, digits: int) -> list:
+	"""Other Sales Invoices that share the same Series counter prefix."""
+	# LIKE narrows the set; exact series membership is checked via prefix parse
+	# so a longer prefix (e.g. XAPF261 vs XAPF26) cannot leak in by accident.
+	rows = frappe.db.sql(
+		"""
+		SELECT name, posting_date
+		FROM `tabSales Invoice`
+		WHERE company = %s
+			AND name LIKE %s
+			AND name != %s
+			AND posting_date IS NOT NULL
+		""",
+		(company, f"{prefix}%", name),
+		as_dict=True,
+	)
+	return [row for row in rows if series_prefix_from_name(row.name, digits) == prefix]

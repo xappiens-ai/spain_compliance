@@ -7,9 +7,11 @@ Dentro de cada **serie**, la numeración de las facturas debe ser **correlativa*
 1. Un número mayor no puede tener fecha de expedición **anterior** a un número menor de la misma serie.
 2. La fecha de expedición no puede ser **posterior a hoy** al guardar: en ERPNext el nombre (número) se asigna al **guardar el borrador**, no al validar. Reservar un número con fecha futura es el anti-patrón que deja huecos cronológicos cuando luego se emiten facturas del periodo intermedio.
 
-La app lo aplica **siempre** en `Sales Invoice.validate` (`spain_compliance.contabilidad.correlatividad`). No hay interruptor en Company: es compliance, no configuración.
+La app lo aplica **siempre** en `Sales Invoice` (`spain_compliance.contabilidad.correlatividad`), en `before_validate` y en `validate`. `before_validate` sigue ejecutándose aunque el llamador use `ignore_validate=True` (API, scripts, importaciones). No hay interruptor en Company: es compliance, no configuración.
 
-Entran en el orden **borradores, validadas y canceladas** de la misma compañía y `naming_series` (cancelar no libera el número ni borra su fecha del criterio).
+La **serie legal** se identifica por el prefijo del número del documento (el mismo que usa `tabSeries`, p. ej. `ACMEF26` en `ACMEF2600060`), no por el texto literal del campo `naming_series`. Así, plantillas distintas que resuelven al mismo contador (`{company_abbr}.F.YY.#####` y `ACME.F.YY.#####`) se validan juntas.
+
+Entran en el orden **borradores, validadas y canceladas** de la misma compañía y serie (cancelar no libera el número ni borra su fecha del criterio). Las enmiendas (`…-1`) cuentan en la misma serie.
 
 ## Qué bloquea el ERP
 
@@ -18,6 +20,8 @@ Entran en el orden **borradores, validadas y canceladas** de la misma compañía
 | Guardar SI con `posting_date` > hoy | Error |
 | Guardar SI cuyo nombre es mayor que otra de la misma serie con fecha **posterior** | Error |
 | Guardar SI cuyo nombre es menor que otra de la misma serie con fecha **anterior** | Error |
+| Misma serie con `naming_series` distinto en el campo (sinónimo / resuelto) | Se valida igual |
+| `insert(ignore_validate=True)` saltándose la regla | Error (antes_validate) |
 | Varias facturas el mismo día | Permitido |
 
 ## Anti-patrón (cuotas / Auto Repeat)
@@ -48,4 +52,4 @@ Por eso la factura de referencia debe ser la del periodo **ya emitido**, no un b
 
 ## Relación con rectificativas
 
-Las facturas de abono van en su **propia serie** (ver [series-facturas-abono.md](series-facturas-abono.md)). La correlatividad se comprueba **dentro de cada** `naming_series`, así que la serie ordinaria y la de rectificativas no se mezclan.
+Las facturas de abono van en su **propia serie** (ver [series-facturas-abono.md](series-facturas-abono.md)). La correlatividad se comprueba **dentro de cada prefijo de contador**, así que la serie ordinaria (`…F26…`) y la de rectificativas (`…R26…`) no se mezclan.

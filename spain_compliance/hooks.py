@@ -62,9 +62,14 @@ doc_events = {
 	},
 	"Sales Invoice": {
 		"before_naming": "spain_compliance.overrides.sales_invoice.on_before_naming",
-		"before_validate": "spain_compliance.contabilidad.cuentas_tercero.on_invoice_before_validate",
+		# before_validate runs even with ignore_validate=True (API / scripts).
+		"before_validate": [
+			"spain_compliance.contabilidad.cuentas_tercero.on_invoice_before_validate",
+			"spain_compliance.overrides.sales_invoice.on_validate_correlatividad",
+		],
 		"validate": [
 			"spain_compliance.contabilidad.registro_fiscal.validar_factura",
+			# Belt-and-suspenders: same check on the normal validate path.
 			"spain_compliance.overrides.sales_invoice.on_validate_correlatividad",
 		],
 		"before_submit": "spain_compliance.contabilidad.registro_fiscal.before_submit",

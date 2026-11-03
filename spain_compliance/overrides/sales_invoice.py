@@ -100,7 +100,12 @@ def on_before_naming(doc, method=None):
 
 
 def on_validate_correlatividad(doc, method=None):
-	"""doc_events: correlatividad after ERPNext's own validate."""
+	"""doc_events: correlatividad on before_validate and validate.
+
+	``before_validate`` still runs when callers pass ``ignore_validate`` (REST,
+	scripts, Data Import flags), so the series/date rule cannot be skipped that
+	way. ``validate`` repeats the check on the normal save path.
+	"""
 	validate_sales_invoice_correlatividad(doc)
 
 

@@ -7,12 +7,19 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_days, getdate, nowdate
 
+from spain_compliance.contabilidad.correlatividad import (
+	get_counter_digits,
+	series_prefix_from_name,
+)
+
 COMPANY = "_Test SC Correl"
 ABBR = "_TSCCR"
 CUSTOMER = "_Test SC Correl Cliente"
 ITEM = "_Test SC Correl Item"
 ITEM_GROUP = "_Test SC Correl Items"
 CUSTOMER_GROUP = "_Test SC Correl Clientes"
+
+
 def _ensure_masters():
 	today = getdate(nowdate())
 	if not frappe.db.sql(
@@ -97,6 +104,14 @@ class TestCorrelatividad(FrappeTestCase):
 		# Serie propia por test para no mezclar numeración entre casos.
 		return f"SCORR-{tag}-.YYYY.-"
 
+	def test_prefix_helpers(self):
+		self.assertEqual(get_counter_digits("XAP.F.YY.#####"), 5)
+		self.assertEqual(get_counter_digits("{abbr}.F.YY.{#####}"), 5)
+		self.assertEqual(get_counter_digits("SINV-.YY.-"), 5)
+		self.assertEqual(series_prefix_from_name("XAPF2600060", 5), "XAPF26")
+		self.assertEqual(series_prefix_from_name("XAPF2600016-1", 5), "XAPF26")
+		self.assertEqual(series_prefix_from_name("SCORR-SAME-2026-00001", 5), "SCORR-SAME-2026-")
+
 	def test_fecha_futura_se_rechaza_al_guardar(self):
 		inv = _invoice(add_days(nowdate(), 30), self._series("FUT"))
 		with self.assertRaises(frappe.ValidationError):
@@ -134,3 +149,34 @@ class TestCorrelatividad(FrappeTestCase):
 			_invoice(add_days(d1, -1), series).insert()
 		b = _invoice(d2, series).insert()
 		self.assertGreater(b.name, a.name)
+
+	def test_misma_serie_con_plantilla_naming_distinta(self):
+		"""Equivalent naming_series strings that share tabSeries must correlate.
+
+		Reproduces the production gap: one invoice stored a field template and a
+		later API invoice stored a resolved synonym; filtering by naming_series
+		equality let a backdated number through.
+		"""
+		year = getdate(nowdate()).strftime("%Y")
+		# Distinct field values, same Series counter prefix (literal year + #####).
+		series_a = f"SCXTMPL.F.{year}."
+		series_alt = f"SCXTMPL.F.{year}.#####"
+
+		later = nowdate()
+		earlier = add_days(nowdate(), -5)
+		first = _invoice(later, series_a).insert()
+		self.assertNotEqual(series_a, series_alt)
+		self.assertEqual(series_prefix_from_name(first.name, 5), f"SCXTMPLF{year}")
+		with self.assertRaises(frappe.ValidationError):
+			_invoice(earlier, series_alt).insert()
+
+
+	def test_ignore_validate_no_salta_correlatividad(self):
+		series = self._series("IGN")
+		later = nowdate()
+		earlier = add_days(nowdate(), -7)
+		_invoice(later, series).insert()
+		blocked = _invoice(earlier, series)
+		blocked.flags.ignore_validate = True
+		with self.assertRaises(frappe.ValidationError):
+			blocked.insert()
