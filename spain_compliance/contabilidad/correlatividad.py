@@ -8,11 +8,8 @@ numeración debe ser correlativa. En la práctica española eso implica además
 orden cronológico: un número mayor no puede llevar fecha de expedición anterior
 a un número menor de la misma serie.
 
-El número **oficial** se asigna al validar (submit), no al guardar el borrador
-(ver ``numeracion``). Por tanto la correlatividad se aplica sobre nombres
-oficiales: al validar (tras renombrar) y al guardar borradores que ya tuvieran
-número oficial (legado). Los borradores provisionales (``SCBOR-…``) no entran
-en la serie legal ni consumen correlatividad.
+El ``name`` se asigna como en ERPNext (serie oficial al insertar el borrador).
+La correlatividad se comprueba al guardar y al validar, sobre ese nombre.
 
 La identidad de serie se deduce del **nombre** del documento (prefijo del
 contador en ``tabSeries``), no del texto de ``naming_series``. Dos plantillas
@@ -28,8 +25,6 @@ import frappe
 from frappe import _
 from frappe.utils import getdate, today
 
-from spain_compliance.contabilidad.numeracion import PROVISIONAL_NAME_PREFIX, is_provisional_name
-
 _HASH_RUN = re.compile(r"#+")
 _AMEND_SUFFIX = re.compile(r"^(.+)-(\d+)$")
 
@@ -39,9 +34,6 @@ def validate_sales_invoice_correlatividad(doc, method=None):
 	if frappe.flags.in_install or frappe.flags.in_migrate or frappe.flags.in_patch:
 		return
 	if not doc.get("name") or doc.name.startswith("new-"):
-		return
-	if is_provisional_name(doc.name):
-		# Draft without an official number yet — nothing to correlate.
 		return
 	if not doc.get("posting_date"):
 		return
@@ -65,7 +57,7 @@ def series_prefix_from_name(name: str | None, digits: int) -> str | None:
 
 	``XAPF2600060`` + 5 → ``XAPF26``; amended ``XAPF2600016-1`` → ``XAPF26``.
 	"""
-	if not name or name.startswith("new-") or is_provisional_name(name):
+	if not name or name.startswith("new-"):
 		return None
 
 	base = name
@@ -81,16 +73,15 @@ def series_prefix_from_name(name: str | None, digits: int) -> str | None:
 
 
 def _validate_posting_date_not_future(doc):
-	"""No emitir factura con fecha de expedición futura (el número ya es oficial)."""
+	"""No guardar ni emitir factura con fecha de expedición futura."""
 	if getdate(doc.posting_date) <= getdate(today()):
 		return
 
 	frappe.throw(
 		_(
-			"No se puede emitir ni guardar la factura {0} con fecha {1}: la fecha de "
-			"expedición no puede ser posterior a hoy ({2}). El número de serie "
-			"oficial se asigna al validar; una fecha futura dejaría la serie "
-			"desordenada respecto a facturas del periodo intermedio."
+			"No se puede guardar ni emitir la factura {0} con fecha {1}: la fecha de "
+			"expedición no puede ser posterior a hoy ({2}). Una fecha futura dejaría "
+			"la serie desordenada respecto a facturas del periodo intermedio."
 		).format(frappe.bold(doc.name), frappe.bold(str(getdate(doc.posting_date))), frappe.bold(today())),
 		title=_("Correlatividad de facturas"),
 	)
@@ -160,10 +151,9 @@ def _peers_in_series(company: str, name: str, prefix: str, digits: int) -> list:
 		WHERE company = %s
 			AND name LIKE %s
 			AND name != %s
-			AND name NOT LIKE %s
 			AND posting_date IS NOT NULL
 		""",
-		(company, f"{prefix}%", name, f"{PROVISIONAL_NAME_PREFIX}%"),
+		(company, f"{prefix}%", name),
 		as_dict=True,
 	)
 	return [row for row in rows if series_prefix_from_name(row.name, digits) == prefix]

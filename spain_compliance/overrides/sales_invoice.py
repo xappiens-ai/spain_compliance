@@ -10,9 +10,8 @@
    invoicing rules require a separate series for rectifying invoices. When a
    Company defines ``serie_rectificativas``, returns created from the ordinary
    series are moved to it before naming.
-3. Numeración oficial al validar (submit): los borradores usan nombre
-   provisional; el número de serie legal se asigna en ``before_validate`` del
-   submit. Correlatividad serie + fecha sobre ese número oficial.
+3. Correlatividad serie + fecha (RD 1619/2012) sobre el ``name`` oficial de
+   ERPNext (asignado al insertar el borrador).
 
 On Frappe v16+ the status logic is wired via ``extend_doctype_class``
 (``SalesInvoiceMixin``). On v15 (no extend API) the same method is applied by
@@ -27,11 +26,6 @@ from frappe.model.document import Document
 from frappe.utils import flt
 
 from spain_compliance.contabilidad.correlatividad import validate_sales_invoice_correlatividad
-from spain_compliance.contabilidad.numeracion import (
-	assign_official_name_on_submit,
-	restore_intended_naming_series,
-	use_provisional_name_on_insert,
-)
 from spain_compliance.setup.custom_fields import COMPANY_RETURN_SERIES_FIELDNAME
 
 LOSS_STATUSES = frozenset({"Dudoso Cobro", "Pérdida"})
@@ -100,23 +94,16 @@ def apply_return_naming_series(doc) -> None:
 
 
 def on_before_naming(doc, method=None):
-	"""doc_events: credit-note series + company_abbr; provisional name for drafts."""
+	"""doc_events: credit-note series + company_abbr before ERPNext naming."""
 	ensure_company_abbr(doc)
 	apply_return_naming_series(doc)
-	use_provisional_name_on_insert(doc)
-
-
-def on_before_validate_numeracion(doc, method=None):
-	"""Restore intended series after provisional naming; assign official name on submit."""
-	restore_intended_naming_series(doc)
-	assign_official_name_on_submit(doc)
 
 
 def on_validate_correlatividad(doc, method=None):
 	"""doc_events: correlatividad on before_validate and validate.
 
-	Runs after official naming on submit. ``before_validate`` still runs when
-	callers pass ``ignore_validate``, so the rule cannot be skipped that way.
+	``before_validate`` still runs when callers pass ``ignore_validate``, so the
+	rule cannot be skipped that way.
 	"""
 	validate_sales_invoice_correlatividad(doc)
 

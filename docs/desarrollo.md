@@ -66,8 +66,7 @@ ERPNext Desk
 | `install.py` | `after_install` / `after_migrate` / `before_uninstall`: Custom Fields y Property Setter de `Sales Invoice.status` |
 | `setup/custom_fields.py` | Definición única de los Custom Fields de la app |
 | `overrides/sales_invoice.py` | Correlatividad; serie rectificativa por Company; estados Dudoso Cobro / Pérdida; API `set_cobro_status` |
-| `contabilidad/numeracion.py` | Nombre provisional en borrador; número oficial al validar (submit) |
-| `contabilidad/correlatividad.py` | Serie + fecha (RD 1619/2012) sobre el número oficial ([correlatividad-facturas.md](correlatividad-facturas.md)) |
+| `contabilidad/correlatividad.py` | Serie + fecha (RD 1619/2012) sobre el `name` de ERPNext ([correlatividad-facturas.md](correlatividad-facturas.md)) |
 | `overrides/account.py` | `root_type` propio por cuenta en compañías PGC |
 | `contabilidad/plan_contable.py` | Grupos/subgrupos PGC, `reestructurar_arbol`, API `convertir_plan_a_pgc` |
 | `contabilidad/cuentas_tercero.py` | Subcuenta por cliente/proveedor con secuencia PGC; backfill `crear_cuentas_pendientes` ([cuentas-tercero.md](cuentas-tercero.md)) |
