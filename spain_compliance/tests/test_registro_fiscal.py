@@ -327,6 +327,7 @@ class TestRegistroFiscal(FrappeTestCase):
 	def test_cancelar_anula_el_registro(self):
 		inv = self._venta([self._impuesto(tipo_impuesto=TIPO_IVA, clave_iva=CLAVE_SUJETA)])
 		inv.submit()
+		inv.reload()
 		self.assertEqual(len(_registros(inv.name)), 1)
 		inv.cancel()
 		self.assertEqual(_registros(inv.name), [])

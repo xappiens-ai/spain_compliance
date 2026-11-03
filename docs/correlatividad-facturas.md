@@ -5,50 +5,54 @@
 Dentro de cada **serie**, la numeración de las facturas debe ser **correlativa**. En la práctica de facturación española eso implica también **orden cronológico**:
 
 1. Un número mayor no puede tener fecha de expedición **anterior** a un número menor de la misma serie.
-2. La fecha de expedición no puede ser **posterior a hoy** al guardar: en ERPNext el nombre (número) se asigna al **guardar el borrador**, no al validar. Reservar un número con fecha futura es el anti-patrón que deja huecos cronológicos cuando luego se emiten facturas del periodo intermedio.
+2. La fecha de expedición no puede ser **posterior a hoy** al emitir (validar) la factura.
 
-La app lo aplica **siempre** en `Sales Invoice` (`spain_compliance.contabilidad.correlatividad`), en `before_validate` y en `validate`. `before_validate` sigue ejecutándose aunque el llamador use `ignore_validate=True` (API, scripts, importaciones). No hay interruptor en Company: es compliance, no configuración.
+## Cuándo se asigna el número
 
-La **serie legal** se identifica por el prefijo del número del documento (el mismo que usa `tabSeries`, p. ej. `ACMEF26` en `ACMEF2600060`), no por el texto literal del campo `naming_series`. Así, plantillas distintas que resuelven al mismo contador (`{company_abbr}.F.YY.#####` y `ACME.F.YY.#####`) se validan juntas.
+El número **oficial** de factura se asigna al **validar** (submit), no al guardar el borrador.
 
-Entran en el orden **borradores, validadas y canceladas** de la misma compañía y serie (cancelar no libera el número ni borra su fecha del criterio). Las enmiendas (`…-1`) cuentan en la misma serie.
+| Estado | Nombre del documento | Serie legal |
+|--------|----------------------|-------------|
+| Borrador nuevo | Provisional (`SCBOR-…`) | Aún no consume contador |
+| Validada / cancelada | Serie oficial (`…F26…`, `…R26…`) | Sí |
+
+El campo `naming_series` del borrador guarda la **serie oficial prevista** (ordinaria o rectificativa). Al validar, el documento se renombra al siguiente número de esa serie y entonces se comprueba la correlatividad.
+
+Así se evita el anti-patrón de ERPNext (reservar número al guardar) que dejaba borradores atrapados o huecos al validar.
+
+La app lo aplica **siempre**. No hay interruptor en Company.
+
+La **serie legal** se identifica por el prefijo del número del documento (el mismo que usa `tabSeries`, p. ej. `ACMEF26` en `ACMEF2600060`), no por el texto literal del campo `naming_series`. Plantillas distintas que resuelven al mismo contador se validan juntas.
+
+Entran en el orden facturas con **número oficial** (validadas, canceladas y borradores legados que ya lo tuvieran). Los `SCBOR-…` no cuentan. Las enmiendas (`…-1`) siguen el esquema de ERPNext y cuentan en la misma serie.
+
+`before_validate` sigue ejecutándose con `ignore_validate=True` (API / scripts).
 
 ## Qué bloquea el ERP
 
 | Acción | Resultado |
 |--------|-----------|
-| Guardar SI con `posting_date` > hoy | Error |
-| Guardar SI cuyo nombre es mayor que otra de la misma serie con fecha **posterior** | Error |
-| Guardar SI cuyo nombre es menor que otra de la misma serie con fecha **anterior** | Error |
+| Guardar borrador (nombre provisional) | OK; no consume serie oficial |
+| Validar SI con `posting_date` > hoy | Error (antes de fijar el número o al comprobar) |
+| Validar SI cuya fecha rompe el orden respecto a números ya oficiales | Error |
 | Misma serie con `naming_series` distinto en el campo (sinónimo / resuelto) | Se valida igual |
-| `insert(ignore_validate=True)` saltándose la regla | Error (antes_validate) |
 | Varias facturas el mismo día | Permitido |
 
 ## Anti-patrón (cuotas / Auto Repeat)
 
-**Incorrecto:** crear en septiembre un borrador de la cuota de noviembre (fecha futura) “para colgarle” el Auto Repeat. Ese borrador **ya consume** un número de serie. Si después sale una factura de octubre, serie y fechas quedan desordenadas.
+**Incorrecto (antes):** crear en septiembre un borrador de la cuota de noviembre con número oficial ya reservado.
 
-**Correcto:**
+**Ahora:** se puede guardar un borrador con fecha futura (nombre `SCBOR-…`); **no** se puede **validar** hasta que la fecha sea ≤ hoy. Lo habitual sigue siendo:
 
 1. Emitir (validar) la factura del **periodo real** con la fecha de ese periodo.
-2. Crear el **Auto Repeat** sobre esa factura, con `start_date` = fecha de esa factura (o el día de recurrencia del ciclo) y frecuencia mensual. El `next_schedule_date` queda en el mes siguiente.
-3. El planificador de Frappe genera la siguiente SI **el día** `next_schedule_date` (copia el documento, pone las fechas obligatorias a esa fecha, y avanza el siguiente ciclo). Opcionalmente `submit_on_creation`.
-
-No hace falta (ni se debe) materializar con antelación el borrador del mes que viene.
+2. Crear el **Auto Repeat** sobre esa factura.
+3. El planificador genera la siguiente SI el día `next_schedule_date` (idealmente con `submit_on_creation`).
 
 ## Auto Repeat (cómo funciona en Frappe)
 
 - DocType **Auto Repeat**: apunta a un documento de referencia (`reference_doctype` + `reference_document`).
-- Campos clave: `frequency`, `start_date`, `next_schedule_date`, `end_date`, `submit_on_creation`, `disabled`.
-- Al guardar el AR, Frappe enlaza `Sales Invoice.auto_repeat` al nombre del AR.
-- El job diario `make_auto_repeat_entry` busca AR activos con `next_schedule_date <= hoy` y, si la fecha programada es **hoy**, llama a `create_documents()`:
-  - Copia la factura de referencia.
-  - Pone `set_posting_time = 1` y las fechas obligatorias (p. ej. `posting_date`) a `next_schedule_date`.
-  - `insert` (y `submit` si está marcado).
-  - Calcula el siguiente `next_schedule_date`.
+- Al generar: copia, pone fechas a `next_schedule_date`, `insert` (nombre provisional) y `submit` si está marcado (ahí recibe el número oficial).
 - Si la generación falla, el AR se desactiva y se registra el error.
-
-Por eso la factura de referencia debe ser la del periodo **ya emitido**, no un borrador futuro.
 
 ## Relación con rectificativas
 

@@ -8,15 +8,15 @@ numeración debe ser correlativa. En la práctica española eso implica además
 orden cronológico: un número mayor no puede llevar fecha de expedición anterior
 a un número menor de la misma serie.
 
-ERPNext asigna el nombre (número) al guardar el borrador, no al validar. Por
-eso la comprobación corre en cada ``before_validate`` / ``validate`` una vez
-existe nombre: impedir reservar un número con fecha futura o romper el orden
-frente a facturas ya existentes (borrador, validadas o canceladas).
+El número **oficial** se asigna al validar (submit), no al guardar el borrador
+(ver ``numeracion``). Por tanto la correlatividad se aplica sobre nombres
+oficiales: al validar (tras renombrar) y al guardar borradores que ya tuvieran
+número oficial (legado). Los borradores provisionales (``SCBOR-…``) no entran
+en la serie legal ni consumen correlatividad.
 
 La identidad de serie se deduce del **nombre** del documento (prefijo del
 contador en ``tabSeries``), no del texto de ``naming_series``. Dos plantillas
-distintas que resuelven al mismo contador (p. ej. ``{company_abbr}.F.YY.#####``
-y ``XAP.F.YY.#####``) son la misma serie legal y deben validarse juntas.
+distintas que resuelven al mismo contador son la misma serie legal.
 ``before_validate`` se ejecuta aunque el llamador pase ``ignore_validate``.
 """
 
@@ -28,6 +28,8 @@ import frappe
 from frappe import _
 from frappe.utils import getdate, today
 
+from spain_compliance.contabilidad.numeracion import PROVISIONAL_NAME_PREFIX, is_provisional_name
+
 _HASH_RUN = re.compile(r"#+")
 _AMEND_SUFFIX = re.compile(r"^(.+)-(\d+)$")
 
@@ -37,6 +39,9 @@ def validate_sales_invoice_correlatividad(doc, method=None):
 	if frappe.flags.in_install or frappe.flags.in_migrate or frappe.flags.in_patch:
 		return
 	if not doc.get("name") or doc.name.startswith("new-"):
+		return
+	if is_provisional_name(doc.name):
+		# Draft without an official number yet — nothing to correlate.
 		return
 	if not doc.get("posting_date"):
 		return
@@ -60,7 +65,7 @@ def series_prefix_from_name(name: str | None, digits: int) -> str | None:
 
 	``XAPF2600060`` + 5 → ``XAPF26``; amended ``XAPF2600016-1`` → ``XAPF26``.
 	"""
-	if not name or name.startswith("new-"):
+	if not name or name.startswith("new-") or is_provisional_name(name):
 		return None
 
 	base = name
@@ -76,18 +81,16 @@ def series_prefix_from_name(name: str | None, digits: int) -> str | None:
 
 
 def _validate_posting_date_not_future(doc):
-	"""No reservar número de factura con fecha de expedición futura."""
+	"""No emitir factura con fecha de expedición futura (el número ya es oficial)."""
 	if getdate(doc.posting_date) <= getdate(today()):
 		return
 
 	frappe.throw(
 		_(
 			"No se puede emitir ni guardar la factura {0} con fecha {1}: la fecha de "
-			"expedición no puede ser posterior a hoy ({2}). El número de serie se "
-			"asigna al guardar; reservar un borrador con fecha futura rompe la "
-			"correlatividad cuando se emitan facturas intermedias. Para cuotas "
-			"periódicas, emita la factura del periodo actual y configure Auto Repeat "
-			"sobre esa factura (el ERP generará la siguiente cuando toque)."
+			"expedición no puede ser posterior a hoy ({2}). El número de serie "
+			"oficial se asigna al validar; una fecha futura dejaría la serie "
+			"desordenada respecto a facturas del periodo intermedio."
 		).format(frappe.bold(doc.name), frappe.bold(str(getdate(doc.posting_date))), frappe.bold(today())),
 		title=_("Correlatividad de facturas"),
 	)
@@ -150,8 +153,6 @@ def _validate_series_chronology(doc):
 
 def _peers_in_series(company: str, name: str, prefix: str, digits: int) -> list:
 	"""Other Sales Invoices that share the same Series counter prefix."""
-	# LIKE narrows the set; exact series membership is checked via prefix parse
-	# so a longer prefix (e.g. XAPF261 vs XAPF26) cannot leak in by accident.
 	rows = frappe.db.sql(
 		"""
 		SELECT name, posting_date
@@ -159,9 +160,10 @@ def _peers_in_series(company: str, name: str, prefix: str, digits: int) -> list:
 		WHERE company = %s
 			AND name LIKE %s
 			AND name != %s
+			AND name NOT LIKE %s
 			AND posting_date IS NOT NULL
 		""",
-		(company, f"{prefix}%", name),
+		(company, f"{prefix}%", name, f"{PROVISIONAL_NAME_PREFIX}%"),
 		as_dict=True,
 	)
 	return [row for row in rows if series_prefix_from_name(row.name, digits) == prefix]
